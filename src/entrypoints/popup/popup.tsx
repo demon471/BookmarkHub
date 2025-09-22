@@ -4,8 +4,7 @@ import { Dropdown, Badge } from 'react-bootstrap';
 import { IconContext } from 'react-icons'
 import {
     AiOutlineCloudUpload, AiOutlineCloudDownload,
-    AiOutlineCloudSync, AiOutlineSetting, AiOutlineClear,
-    AiOutlineInfoCircle, AiOutlineGithub
+    AiOutlineCloudSync, AiOutlineSetting, AiOutlineClear
 } from 'react-icons/ai'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './popup.css'
@@ -43,9 +42,20 @@ const Popup: React.FC = () => {
                 <Dropdown.Divider />
                 <Dropdown.Item name='setting' as="button"><AiOutlineSetting />{browser.i18n.getMessage('settings')}</Dropdown.Item>
                 <Dropdown.ItemText>
-                    <AiOutlineInfoCircle /><a href="https://github.com/dudor/BookmarkHub" target="_blank">{browser.i18n.getMessage('help')}</a>|
-                    <Badge id="localCount" variant="light" title={browser.i18n.getMessage('localCount')}>{count["local"]}</Badge>/<Badge id="remoteCount" variant="light" title={browser.i18n.getMessage('remoteCount')}>{count["remote"]}</Badge>|
-                    <a href="https://github.com/dudor" target="_blank" title={browser.i18n.getMessage('author')}><AiOutlineGithub /></a>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Badge id="localCount" variant="light" title={browser.i18n.getMessage('localCount')}>{count["local"]}</Badge>
+                            <span style={{ fontSize: '12px', color: '#666' }}>本地</span>
+                        </div>
+                        <span style={{ color: '#ccc' }}>/</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Badge id="remoteCount" variant="light" title={browser.i18n.getMessage('remoteCount')}>{count["remote"]}</Badge>
+                            <span style={{ fontSize: '12px', color: '#666' }}>远程</span>
+                        </div>
+                        <Badge variant="success" title="自动同步已启用 - 每2秒检查一次">
+                            <AiOutlineCloudSync /> 自动同步
+                        </Badge>
+                    </div>
                 </Dropdown.ItemText>
             </Dropdown.Menu >
         </IconContext.Provider>

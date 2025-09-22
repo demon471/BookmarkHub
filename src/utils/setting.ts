@@ -8,6 +8,10 @@ export class SettingBase implements Options {
     gistFileName: string = 'BookmarkHub';
     enableNotify: boolean = true;
     githubURL: string = 'https://api.github.com';
+    // Auto sync configuration
+    autoSyncEnabled: boolean = false;
+    autoSyncInterval: number = 15; // minutes
+    lastSyncTime: number = 0; // timestamp
 }
 export class Setting extends SettingBase {
     private constructor() { super() }
@@ -18,6 +22,10 @@ export class Setting extends SettingBase {
         setting.gistFileName = options.gistFileName;
         setting.githubToken = options.githubToken;
         setting.enableNotify = options.enableNotify;
+        // Auto sync configuration mapping
+        setting.autoSyncEnabled = options.autoSyncEnabled || false;
+        setting.autoSyncInterval = options.autoSyncInterval || 15;
+        setting.lastSyncTime = options.lastSyncTime || 0;
         return setting;
     }
 }

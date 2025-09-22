@@ -23,7 +23,16 @@ class BookmarkService {
     }
     async update(data: any) {
         let setting = await Setting.build();
-        return http.patch(`gists/${setting.gistID}`, { json: data }).json();
+        console.log('BookmarkService.update called with:', {
+            gistID: setting.gistID,
+            dataKeys: Object.keys(data),
+            filesKeys: Object.keys(data.files || {}),
+            dataSize: JSON.stringify(data).length
+        });
+        
+        const result = await http.patch(`gists/${setting.gistID}`, { json: data }).json();
+        console.log('BookmarkService.update result:', result);
+        return result;
     }
 }
 

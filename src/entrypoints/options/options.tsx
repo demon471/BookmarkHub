@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import ReactDOM from 'react-dom/client';
 import { Container, Form, Button, Col, Row, InputGroup } from 'react-bootstrap';
+// @ts-ignore
 import { useForm } from "react-hook-form";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './options.css'

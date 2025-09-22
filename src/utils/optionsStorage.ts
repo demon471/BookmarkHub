@@ -8,6 +8,10 @@ export default new OptionsSync({
         gistFileName: 'BookmarkHub',
         enableNotify: true,
         githubURL: 'https://api.github.com',
+        // Auto sync configuration
+        autoSyncEnabled: false,
+        autoSyncInterval: 15,
+        lastSyncTime: 0,
     },
 
     // List of functions that are called when the extension is updated

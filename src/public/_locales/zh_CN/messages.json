@@ -86,5 +86,49 @@
     "removeAllBookmarksDesc": {
         "message": "清空本地浏览器书签，请先做好备份",
         "description": ""
+    },
+    "autoSyncEnabled": {
+        "message": "启用自动同步",
+        "description": ""
+    },
+    "autoSyncInterval": {
+        "message": "同步间隔",
+        "description": ""
+    },
+    "autoSyncInterval5": {
+        "message": "5分钟",
+        "description": ""
+    },
+    "autoSyncInterval15": {
+        "message": "15分钟",
+        "description": ""
+    },
+    "autoSyncInterval30": {
+        "message": "30分钟",
+        "description": ""
+    },
+    "autoSyncInterval60": {
+        "message": "1小时",
+        "description": ""
+    },
+    "autoSyncIntervalOff": {
+        "message": "关闭",
+        "description": ""
+    },
+    "autoSyncStatus": {
+        "message": "自动同步状态",
+        "description": ""
+    },
+    "autoSyncEnabledDesc": {
+        "message": "按指定间隔自动同步书签",
+        "description": ""
+    },
+    "autoSyncLastSync": {
+        "message": "上次同步",
+        "description": ""
+    },
+    "autoSyncNextSync": {
+        "message": "下次同步",
+        "description": ""
     }
 }

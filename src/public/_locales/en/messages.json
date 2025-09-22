@@ -86,5 +86,49 @@
     "removeAllBookmarksDesc": {
         "message": "Remove All Bookmarks, Please backup first",
         "description": ""
+    },
+    "autoSyncEnabled": {
+        "message": "Enable Auto Sync",
+        "description": ""
+    },
+    "autoSyncInterval": {
+        "message": "Sync Interval",
+        "description": ""
+    },
+    "autoSyncInterval5": {
+        "message": "5 minutes",
+        "description": ""
+    },
+    "autoSyncInterval15": {
+        "message": "15 minutes",
+        "description": ""
+    },
+    "autoSyncInterval30": {
+        "message": "30 minutes",
+        "description": ""
+    },
+    "autoSyncInterval60": {
+        "message": "1 hour",
+        "description": ""
+    },
+    "autoSyncIntervalOff": {
+        "message": "Off",
+        "description": ""
+    },
+    "autoSyncStatus": {
+        "message": "Auto Sync Status",
+        "description": ""
+    },
+    "autoSyncEnabledDesc": {
+        "message": "Automatically sync bookmarks at specified intervals",
+        "description": ""
+    },
+    "autoSyncLastSync": {
+        "message": "Last Sync",
+        "description": ""
+    },
+    "autoSyncNextSync": {
+        "message": "Next Sync",
+        "description": ""
     }
 }
