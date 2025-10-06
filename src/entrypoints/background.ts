@@ -28,6 +28,8 @@ export default defineBackground(() => {
     
     // 启动自动同步检查（配置完成后才会真正同步）
     await startAutoSync();
+    // 初始化本地书签计数
+    await refreshLocalCount();
   });
 
   let curOperType = OperType.NONE;
@@ -38,7 +40,7 @@ export default defineBackground(() => {
       curOperType = OperType.SYNC
       uploadBookmarks().then(() => {
         curOperType = OperType.NONE
-        browser.action.setBadgeText({ text: "" });
+        // Badge handled by uploadBookmarks()
         refreshLocalCount();
         sendResponse(true);
       });
@@ -47,7 +49,7 @@ export default defineBackground(() => {
       curOperType = OperType.SYNC
       downloadBookmarks().then(() => {
         curOperType = OperType.NONE
-        browser.action.setBadgeText({ text: "" });
+        // Badge handled by downloadBookmarks()
         refreshLocalCount();
         sendResponse(true);
       });
@@ -55,9 +57,9 @@ export default defineBackground(() => {
     }
     if (msg.name === 'removeAll') {
       curOperType = OperType.REMOVE
-      clearBookmarkTree().then(() => {
+      clearBookmarkTree().then(async () => {
         curOperType = OperType.NONE
-        browser.action.setBadgeText({ text: "" });
+        await showSyncBadge('success');
         refreshLocalCount();
         sendResponse(true);
       });
@@ -206,6 +208,7 @@ export default defineBackground(() => {
   async function uploadBookmarks() {
     try {
       console.log('Starting upload bookmarks...');
+      await showSyncBadge('syncing');
       
       let setting = await Setting.build()
       console.log('Setting loaded:', {
@@ -277,10 +280,14 @@ export default defineBackground(() => {
       }
       
       console.log('Upload bookmarks completed successfully');
+      await showSyncBadge('success');
+      // Refresh local count for popup display
+      await refreshLocalCount();
 
     }
     catch (error: any) {
       console.error('Upload bookmarks error:', error);
+      await showSyncBadge('error');
       
       // 只在配置问题时显示一次提示
       const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
@@ -312,6 +319,9 @@ export default defineBackground(() => {
   }
   async function downloadBookmarks() {
     try {
+      console.log('Starting download bookmarks...');
+      await showSyncBadge('syncing');
+      
       let gist = await BookmarkService.get();
       let setting = await Setting.build()
       if (gist) {
@@ -344,6 +354,9 @@ export default defineBackground(() => {
             message: browser.i18n.getMessage('success')
           });
         }
+        await showSyncBadge('success');
+        // Refresh local count for popup display
+        await refreshLocalCount();
       }
       else {
         await browser.notifications.create({
@@ -352,10 +365,12 @@ export default defineBackground(() => {
           title: browser.i18n.getMessage('downloadBookmarks'),
           message: `${browser.i18n.getMessage('error')}：Gist File ${setting.gistFileName} Not Found`
         });
+        await showSyncBadge('error');
       }
     }
     catch (error: any) {
       console.error(error);
+      await showSyncBadge('error');
       
       // 只在配置问题时显示一次提示
       const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
@@ -684,6 +699,40 @@ export default defineBackground(() => {
   // API rate limiting
   let lastApiCallTime = 0;
   const MIN_API_INTERVAL = 3000; // 最小API调用间隔3秒
+  
+  // Sync status badge management
+  let badgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  
+  async function showSyncBadge(status: 'syncing' | 'success' | 'error') {
+    // Clear any existing timeout
+    if (badgeTimeoutId) {
+      clearTimeout(badgeTimeoutId);
+      badgeTimeoutId = null;
+    }
+    
+    switch (status) {
+      case 'syncing':
+        await browser.action.setBadgeText({ text: "↻" });
+        await browser.action.setBadgeBackgroundColor({ color: "#007bff" }); // 蓝色
+        console.log('🔵 Badge: Syncing...');
+        break;
+      case 'success':
+        // 成功后直接清除，不显示绿色图标（避免闪烁）
+        await browser.action.setBadgeText({ text: "" });
+        console.log('✅ Sync completed, badge cleared');
+        break;
+      case 'error':
+        await browser.action.setBadgeText({ text: "✗" });
+        await browser.action.setBadgeBackgroundColor({ color: "#dc3545" }); // 红色
+        console.log('🔴 Badge: Error');
+        // 5秒后清除
+        badgeTimeoutId = setTimeout(async () => {
+          await browser.action.setBadgeText({ text: "" });
+          console.log('Badge cleared after error');
+        }, 5000);
+        break;
+    }
+  }
 
   // Check if API can be called (rate limiting)
   function canCallApi(): boolean {
@@ -738,32 +787,30 @@ export default defineBackground(() => {
           curOperType = OperType.SYNC;
           
           // Show sync in progress badge
-          browser.action.setBadgeText({ text: "↻" });
-          browser.action.setBadgeBackgroundColor({ color: "#007bff" });
+          await showSyncBadge('syncing');
           
           // Perform smart sync immediately with API rate limiting
           await smartSync();
           
-          // Clear badge after sync - remove the warning badge
-          await refreshLocalCount();
-          browser.action.setBadgeText({ text: "" });
+          // Badge will be updated by smartSync function
           
           // Reset operation type
           curOperType = OperType.NONE;
         } catch (error) {
           console.error('Error in auto sync:', error);
+          // Show error badge
+          await showSyncBadge('error');
           // Reset operation type on error
           curOperType = OperType.NONE;
-          browser.action.setBadgeText({ text: "" });
         }
       } else {
         console.log('⏸️ Auto sync skipped: Currently syncing');
       }
     } catch (error) {
       console.error('Error triggering auto sync:', error);
+      await showSyncBadge('error');
       // Reset operation type on error
       curOperType = OperType.NONE;
-      browser.action.setBadgeText({ text: "" });
     }
   }
 
@@ -926,16 +973,21 @@ export default defineBackground(() => {
           remoteCount,
           structureDiff: localStructure.length - remoteStructure.length
         });
+        // uploadBookmarks will handle badge display
         await uploadBookmarks();
         console.log('✅ Smart sync upload completed');
         // Update bookmark structure tracking after successful upload
         await updateBookmarkStructureTracking();
       } else {
         console.log('ℹ️ Local and remote data are identical, skipping sync');
+        // Show success badge for "no changes" status
+        await showSyncBadge('success');
       }
+      // Always refresh local count after sync check
+      await refreshLocalCount();
     } catch (error) {
       console.error('Smart sync error:', error);
-      // Auto sync error - no notification needed
+      await showSyncBadge('error');
     }
   }
 
@@ -998,6 +1050,8 @@ export default defineBackground(() => {
   browser.runtime.onStartup.addListener(async () => {
     console.log('🔧 Extension startup');
     await startAutoSync();
+    // Refresh local count on startup
+    await refreshLocalCount();
   });
 
   // Clean up timers when extension is suspended or closed
