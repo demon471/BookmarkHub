@@ -26,10 +26,9 @@ export default defineBackground(() => {
       }
     }
     
-    // 启动自动同步检查（配置完成后才会真正同步）
-    await startAutoSync();
     // 初始化本地书签计数
     await refreshLocalCount();
+    console.log('✅ Extension installed, ready to sync on bookmark changes');
   });
 
   let curOperType = OperType.NONE;
@@ -715,11 +714,6 @@ export default defineBackground(() => {
     return b;
   }
 
-  // Auto sync functionality
-  let autoSyncTimer: string | null = null;
-  let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
-  const AUTO_SYNC_INTERVAL = 5000; // 5秒自动同步间隔
-  
   // API rate limiting
   let lastApiCallTime = 0;
   const MIN_API_INTERVAL = 3000; // 最小API调用间隔3秒
@@ -1027,64 +1021,140 @@ export default defineBackground(() => {
     }
   }
 
-  // Start auto sync with 5 second interval
-  async function startAutoSync(): Promise<void> {
+
+
+  /**
+   * 启动时自动拉取最新版本（智能判断）
+   */
+  async function pullLatestOnStartup(): Promise<void> {
     try {
-      // Clear existing interval
-      if (autoSyncInterval) {
-        clearInterval(autoSyncInterval);
+      console.log('🔄 Checking for remote updates on startup...');
+      
+      // 检查配置是否完整
+      const setting = await Setting.build();
+      if (!setting.githubToken || !setting.gistID) {
+        console.log('⏸️ Startup pull skipped: GitHub not configured');
+        return;
       }
-
-      // Create new interval with 5 second interval
-      autoSyncInterval = setInterval(async () => {
-        try {
-          // Check if initial sync is completed
-          const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
-          if (!initialSyncCompleted) {
-            console.log('Auto sync interval skipped: Waiting for initial sync to complete');
-            return;
-          }
-          await smartSync();
-        } catch (error) {
-          console.error('Error in auto sync interval:', error);
-        }
-      }, AUTO_SYNC_INTERVAL);
-
-      console.log(`Auto sync started with ${AUTO_SYNC_INTERVAL}ms interval`);
-    } catch (error) {
-      console.error('Error starting auto sync:', error);
+      
+      // 检查初始同步是否完成
+      const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
+      if (!initialSyncCompleted) {
+        console.log('⏸️ Startup pull skipped: Waiting for initial sync to complete');
+        return;
+      }
+      
+      // 获取远程数据
+      const gist = await BookmarkService.get();
+      if (!gist) {
+        console.log('⏸️ Startup pull skipped: No remote data found');
+        return;
+      }
+      
+      const remoteSyncData: SyncDataInfo = JSON.parse(gist);
+      if (!remoteSyncData.bookmarks || remoteSyncData.bookmarks.length === 0) {
+        console.log('⏸️ Startup pull skipped: Remote data is empty');
+        return;
+      }
+      
+      // 获取本地书签
+      const localBookmarks = await getBookmarks();
+      const localStructure = JSON.stringify(formatBookmarks(localBookmarks));
+      const remoteStructure = JSON.stringify(remoteSyncData.bookmarks);
+      
+      const localCount = getBookmarkCount(localBookmarks);
+      const remoteCount = getBookmarkCount(remoteSyncData.bookmarks);
+      
+      console.log('📊 Startup comparison:', {
+        localCount,
+        remoteCount,
+        localSize: localStructure.length,
+        remoteSize: remoteStructure.length,
+        identical: localStructure === remoteStructure
+      });
+      
+      // 比较本地和远程是否一致
+      if (localStructure === remoteStructure) {
+        console.log('✅ Local and remote are identical, skipping pull');
+        // 更新最后同步时间
+        await browser.storage.local.set({ lastSyncTime: remoteSyncData.createDate });
+        return;
+      }
+      
+      // 检查本地是否有未同步的修改
+      const { lastBookmarkStructure } = await browser.storage.local.get(['lastBookmarkStructure']);
+      const localHasChanges = lastBookmarkStructure && lastBookmarkStructure !== localStructure;
+      
+      if (localHasChanges) {
+        console.log('⚠️ Startup pull skipped: Local has unsaved changes');
+        console.log('   💡 Local changes will be uploaded by auto-sync');
+        return;
+      }
+      
+      // 远程和本地不同，且本地无未同步修改 -> 下载
+      console.log('🔽 Pulling latest version from remote...');
+      console.log(`   📥 Downloading ${remoteCount} bookmarks from remote`);
+      
+      await showSyncBadge('syncing');
+      
+      // 执行下载
+      isClearing = true;
+      await clearBookmarkTree();
+      isClearing = false;
+      await createBookmarkTree(remoteSyncData.bookmarks);
+      
+      // 更新存储
+      await browser.storage.local.set({ 
+        remoteCount: remoteCount,
+        lastSyncTime: remoteSyncData.createDate
+      });
+      
+      // 更新书签结构追踪
+      await updateBookmarkStructureTracking();
+      
+      console.log('✅ Startup pull completed:', {
+        bookmarksDownloaded: remoteCount,
+        remoteTime: new Date(remoteSyncData.createDate).toLocaleString()
+      });
+      
+      // 显示通知
+      if (setting.enableNotify) {
+        await browser.notifications.create({
+          type: "basic",
+          iconUrl: iconLogo,
+          title: '启动同步',
+          message: `已从远程拉取最新书签（${remoteCount}个）`
+        });
+      }
+      
+      await showSyncBadge('success');
+      await refreshLocalCount();
+      
+    } catch (error: any) {
+      console.error('❌ Startup pull error:', error);
+      isClearing = false; // 确保错误时也清除标志
+      // 静默失败，不显示错误通知
+      console.log('⚠️ Startup pull failed silently');
     }
   }
 
-  // Stop auto sync
-  async function stopAutoSync(): Promise<void> {
-    try {
-      if (autoSyncInterval) {
-        clearInterval(autoSyncInterval);
-        autoSyncInterval = null;
-        console.log('Auto sync stopped');
-      }
-    } catch (error) {
-      console.error('Error stopping auto sync:', error);
-    }
-  }
-
-
-  // Initialize auto sync on startup
+  // Initialize on startup
   browser.runtime.onStartup.addListener(async () => {
     console.log('🔧 Extension startup');
-    await startAutoSync();
+    
+    // 延迟1秒后执行拉取，避免启动时资源竞争
+    setTimeout(async () => {
+      await pullLatestOnStartup();
+    }, 1000);
+    
     // Refresh local count on startup
     await refreshLocalCount();
+    console.log('✅ Extension ready to sync on bookmark changes');
   });
 
-  // Clean up timers when extension is suspended or closed
+  // Extension suspended handler
   browser.runtime.onSuspend.addListener(() => {
-    if (autoSyncInterval) {
-      clearInterval(autoSyncInterval);
-      autoSyncInterval = null;
-      console.log('Auto sync interval cleared on suspend');
-    }
+    console.log('Extension suspended');
   });
 
   ///暂时不启用自动备份
