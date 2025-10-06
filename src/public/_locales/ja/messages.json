@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "全てのブックマークを削除します。事前にバックアップを行ってください。",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "初回同期設定",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "ローカルブックマークを検出しました：{count}個。同期方向を選択してください：",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "リモートからダウンロード（ローカルを上書き）",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "リモートにアップロード（リモートを上書き）",
+        "description": "Button to upload to remote"
     }
 }

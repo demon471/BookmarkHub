@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "أزل جميع العلامات المرجعية. يرجى إجراء نسخ احتياطي أولاً",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "تكوين المزامنة الأولية",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "تم اكتشاف إشارات مرجعية محلية: {count} عنصر. يرجى اختيار اتجاه المزامنة:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "تنزيل من البعيد (استبدال المحلي)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "تحميل إلى البعيد (استبدال البعيد)",
+        "description": "Button to upload to remote"
     }
 }

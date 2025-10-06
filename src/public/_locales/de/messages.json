@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "Alle Bookmarks löschen. Bitte erstellen Sie vorher ein Backup.",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Erste Synchronisierungskonfiguration",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Lokale Lesezeichen erkannt: {count} Elemente. Bitte wählen Sie die Synchronisierungsrichtung:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Von Remote herunterladen (lokal überschreiben)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Auf Remote hochladen (Remote überschreiben)",
+        "description": "Button to upload to remote"
     }
 }

@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "Eliminar todos los marcadores. Por favor, realice una copia de seguridad primero.",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Configuración de sincronización inicial",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Marcadores locales detectados: {count} elementos. Por favor, elija la dirección de sincronización:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Descargar desde remoto (sobrescribir local)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Subir a remoto (sobrescribir remoto)",
+        "description": "Button to upload to remote"
     }
 }

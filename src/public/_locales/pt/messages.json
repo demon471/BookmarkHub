@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "Remover todos os favoritos. Por favor, faça um backup primeiro.",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Configuração de sincronização inicial",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Favoritos locais detectados: {count} itens. Por favor, escolha a direção de sincronização:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Baixar do remoto (sobrescrever local)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Enviar para o remoto (sobrescrever remoto)",
+        "description": "Button to upload to remote"
     }
 }

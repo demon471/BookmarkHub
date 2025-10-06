@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "Rimuovi tutti i segnalibri. Fai prima un backup.",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Configurazione sincronizzazione iniziale",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Segnalibri locali rilevati: {count} elementi. Scegli la direzione di sincronizzazione:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Scarica da remoto (sovrascrivi locale)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Carica su remoto (sovrascrivi remoto)",
+        "description": "Button to upload to remote"
     }
 }

@@ -1,4 +1,4 @@
-﻿{
+{
     "extensionName": {
         "message": "BookmarkHub - синхронизация закладок ",
         "description": ""
@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "Удалить все закладки, пожалуйста сделайте резервную копию",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Первоначальная настройка синхронизации",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Обнаружены локальные закладки: {count} элементов. Пожалуйста, выберите направление синхронизации:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Загрузить с удалённого сервера (перезаписать локальные)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Выгрузить на удалённый сервер (перезаписать удалённые)",
+        "description": "Button to upload to remote"
     }
 }

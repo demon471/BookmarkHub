@@ -130,5 +130,21 @@
     "autoSyncNextSync": {
         "message": "Next Sync",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "Initial Sync Configuration",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "Local bookmarks detected: {count} items. Please choose sync direction:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "Download from Remote (Overwrite Local)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "Upload to Remote (Overwrite Remote)",
+        "description": "Button to upload to remote"
     }
 }

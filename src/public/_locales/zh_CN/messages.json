@@ -130,5 +130,21 @@
     "autoSyncNextSync": {
         "message": "下次同步",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "首次同步配置",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "检测到本地已有 {count} 个书签，请选择同步方向：",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "从远程拉取（覆盖本地）",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "上传到远程（覆盖远程）",
+        "description": "Button to upload to remote"
     }
 }

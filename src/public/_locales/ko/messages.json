@@ -86,5 +86,21 @@
     "removeAllBookmarksDesc": {
         "message": "모든 북마크를 삭제합니다. 사전에 백업하세요.",
         "description": ""
+    },
+    "initialSyncTitle": {
+        "message": "초기 동기화 설정",
+        "description": "Title for initial sync dialog"
+    },
+    "initialSyncMessage": {
+        "message": "로컬 북마크 감지됨: {count}개. 동기화 방향을 선택하세요:",
+        "description": "Message for initial sync dialog"
+    },
+    "initialSyncDownload": {
+        "message": "원격에서 다운로드 (로컬 덮어쓰기)",
+        "description": "Button to download from remote"
+    },
+    "initialSyncUpload": {
+        "message": "원격에 업로드 (원격 덮어쓰기)",
+        "description": "Button to upload to remote"
     }
 }

@@ -6,11 +6,33 @@ import { Bookmarks } from 'wxt/browser'
 export default defineBackground(() => {
 
   browser.runtime.onInstalled.addListener(async (c) => {
+    console.log('🎉 Extension installed/updated');
+    
+    // 检查是否首次安装
+    if (c.reason === 'install') {
+      // 首次安装，检查GitHub配置
+      const setting = await Setting.build();
+      if (!setting.githubToken || !setting.gistID) {
+        console.log('📌 First install: Opening options page for configuration');
+        // 打开配置页面
+        await browser.runtime.openOptionsPage();
+        // 显示欢迎通知
+        await browser.notifications.create({
+          type: "basic",
+          iconUrl: iconLogo,
+          title: browser.i18n.getMessage('extensionName') || 'BookmarkHub',
+          message: '欢迎使用！请先配置GitHub Token和Gist ID以启用书签同步功能。'
+        });
+      }
+    }
+    
+    // 启动自动同步检查（配置完成后才会真正同步）
     await startAutoSync();
   });
 
   let curOperType = OperType.NONE;
   let curBrowserType = BrowserType.CHROME;
+  let configChangeTimer: ReturnType<typeof setTimeout> | null = null;
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
       curOperType = OperType.SYNC
@@ -45,6 +67,62 @@ export default defineBackground(() => {
       browser.runtime.openOptionsPage().then(() => {
         sendResponse(true);
       });
+    }
+    if (msg.name === 'initialSyncUpload') {
+      console.log('📤 Initial sync: Uploading local bookmarks to remote...');
+      curOperType = OperType.SYNC;
+      uploadBookmarks().then(async () => {
+        curOperType = OperType.NONE;
+        console.log('✅ Initial sync upload completed');
+        await browser.storage.local.set({ initialSyncCompleted: true });
+        await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount']);
+        // Update bookmark structure tracking
+        await updateBookmarkStructureTracking();
+        sendResponse(true);
+      }).catch(async (error) => {
+        console.error('❌ Initial sync upload failed:', error);
+        curOperType = OperType.NONE;
+        sendResponse(false);
+      });
+    }
+    if (msg.name === 'initialSyncDownload') {
+      console.log('📥 Initial sync: Downloading remote bookmarks to local...');
+      curOperType = OperType.SYNC;
+      downloadBookmarks().then(async () => {
+        curOperType = OperType.NONE;
+        console.log('✅ Initial sync download completed');
+        await browser.storage.local.set({ initialSyncCompleted: true });
+        await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount']);
+        // Update bookmark structure tracking
+        await updateBookmarkStructureTracking();
+        sendResponse(true);
+      }).catch(async (error) => {
+        console.error('❌ Initial sync download failed:', error);
+        curOperType = OperType.NONE;
+        sendResponse(false);
+      });
+    }
+    if (msg.name === 'cancelInitialSync') {
+      console.log('❌ Initial sync cancelled by user');
+      (async () => {
+        await browser.storage.local.set({ initialSyncCompleted: true });
+        await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount']);
+        // Update bookmark structure tracking
+        await updateBookmarkStructureTracking();
+        sendResponse(true);
+      })();
+    }
+    if (msg.name === 'triggerInitialSync') {
+      console.log('🔄 Manual trigger: Starting initial sync from options page...');
+      (async () => {
+        try {
+          await performInitialSync();
+          sendResponse(true);
+        } catch (error) {
+          console.error('Failed to trigger initial sync:', error);
+          sendResponse(false);
+        }
+      })();
     }
     return true;
   });
@@ -94,6 +172,36 @@ export default defineBackground(() => {
       await triggerAutoSyncIfEnabled();
     }
   })
+
+  // Listen for configuration changes to trigger initial sync
+  browser.storage.onChanged.addListener(async (changes, areaName) => {
+    if (areaName === 'sync' && (changes.githubToken || changes.gistID)) {
+      console.log('📝 GitHub configuration changed, checking...');
+      if (configChangeTimer) clearTimeout(configChangeTimer);
+      configChangeTimer = setTimeout(async () => {
+        const setting = await Setting.build();
+        if (setting.githubToken && setting.gistID && setting.gistFileName) {
+          console.log('✅ GitHub configuration complete!');
+          console.log('   - Token:', setting.githubToken ? '✓' : '✗');
+          console.log('   - Gist ID:', setting.gistID ? '✓' : '✗');
+          console.log('   - Gist FileName:', setting.gistFileName);
+          
+          // 重置初始同步标记，允许重新执行初始同步逻辑
+          await browser.storage.local.set({ initialSyncCompleted: false });
+          await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount', 'lastConfigErrorNotified']);
+          
+          console.log('🔄 Triggering initial sync after configuration...');
+          await performInitialSync();
+        } else {
+          console.log('⚠️ Configuration incomplete:');
+          console.log('   - Token:', setting.githubToken ? '✓' : '✗');
+          console.log('   - Gist ID:', setting.gistID ? '✓' : '✗');
+          console.log('   - Gist FileName:', setting.gistFileName || '✗');
+        }
+        configChangeTimer = null;
+      }, 1000);
+    }
+  });
 
   async function uploadBookmarks() {
     try {
@@ -155,6 +263,10 @@ export default defineBackground(() => {
       await updateLastSyncTime();
       console.log('Last sync time updated');
       
+      // Update bookmark structure tracking
+      await updateBookmarkStructureTracking();
+      console.log('Bookmark structure tracking updated');
+      
       if (setting.enableNotify) {
         await browser.notifications.create({
           type: "basic",
@@ -169,12 +281,33 @@ export default defineBackground(() => {
     }
     catch (error: any) {
       console.error('Upload bookmarks error:', error);
-      await browser.notifications.create({
-        type: "basic",
-        iconUrl: iconLogo,
-        title: browser.i18n.getMessage('uploadBookmarks'),
-        message: `${browser.i18n.getMessage('error')}：${error.message}`
-      });
+      
+      // 只在配置问题时显示一次提示
+      const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
+      if (isConfigError) {
+        const { lastConfigErrorNotified } = await browser.storage.local.get(['lastConfigErrorNotified']);
+        const now = Date.now();
+        // 只在1小时内显示一次配置错误
+        if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
+          await browser.storage.local.set({ lastConfigErrorNotified: now });
+          await browser.notifications.create({
+            type: "basic",
+            iconUrl: iconLogo,
+            title: browser.i18n.getMessage('uploadBookmarks'),
+            message: `${browser.i18n.getMessage('error')}：${error.message}`
+          });
+        } else {
+          console.log('⏸️ Config error notification suppressed (already notified recently)');
+        }
+      } else {
+        // 非配置错误，正常提示
+        await browser.notifications.create({
+          type: "basic",
+          iconUrl: iconLogo,
+          title: browser.i18n.getMessage('uploadBookmarks'),
+          message: `${browser.i18n.getMessage('error')}：${error.message}`
+        });
+      }
     }
   }
   async function downloadBookmarks() {
@@ -200,6 +333,9 @@ export default defineBackground(() => {
         await browser.storage.local.set({ remoteCount: count });
         // Update last sync time after successful download
         await updateLastSyncTime();
+        // Update bookmark structure tracking
+        await updateBookmarkStructureTracking();
+        console.log('Bookmark structure tracking updated after download');
         if (setting.enableNotify) {
           await browser.notifications.create({
             type: "basic",
@@ -220,12 +356,136 @@ export default defineBackground(() => {
     }
     catch (error: any) {
       console.error(error);
-      await browser.notifications.create({
-        type: "basic",
-        iconUrl: iconLogo,
-        title: browser.i18n.getMessage('downloadBookmarks'),
-        message: `${browser.i18n.getMessage('error')}：${error.message}`
-      });
+      
+      // 只在配置问题时显示一次提示
+      const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
+      if (isConfigError) {
+        const { lastConfigErrorNotified } = await browser.storage.local.get(['lastConfigErrorNotified']);
+        const now = Date.now();
+        // 只在1小时内显示一次配置错误
+        if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
+          await browser.storage.local.set({ lastConfigErrorNotified: now });
+          await browser.notifications.create({
+            type: "basic",
+            iconUrl: iconLogo,
+            title: browser.i18n.getMessage('downloadBookmarks'),
+            message: `${browser.i18n.getMessage('error')}：${error.message}`
+          });
+        } else {
+          console.log('⏸️ Config error notification suppressed (already notified recently)');
+        }
+      } else {
+        // 非配置错误，正常提示
+        await browser.notifications.create({
+          type: "basic",
+          iconUrl: iconLogo,
+          title: browser.i18n.getMessage('downloadBookmarks'),
+          message: `${browser.i18n.getMessage('error')}：${error.message}`
+        });
+      }
+    }
+  }
+
+  async function performInitialSync() {
+    try {
+      const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
+      if (initialSyncCompleted) {
+        console.log('ℹ️ Initial sync already completed, skipping');
+        return;
+      }
+      
+      // 检查GitHub配置是否完成
+      const setting = await Setting.build();
+      if (!setting.githubToken || !setting.gistID) {
+        console.log('⚠️ GitHub not configured yet, waiting for configuration...');
+        // 不设置initialSyncCompleted，保持未完成状态，等待用户配置
+        return;
+      }
+      
+      console.log('🎯 Starting initial sync check...');
+      const bookmarks = await getBookmarks();
+      const localCount = getBookmarkCount(bookmarks);
+      
+      if (localCount === 0) {
+        // 本地无书签，检查远程
+        try {
+          const gist = await BookmarkService.get();
+          if (gist) {
+            const syncdata: SyncDataInfo = JSON.parse(gist);
+            const remoteCount = getBookmarkCount(syncdata.bookmarks);
+            if (remoteCount > 0) {
+              console.log(`📥 Auto-downloading ${remoteCount} bookmarks from remote...`);
+              await downloadBookmarks();
+              await browser.notifications.create({
+                type: "basic",
+                iconUrl: iconLogo,
+                title: '初始同步完成',
+                message: `已从远程下载 ${remoteCount} 个书签`
+              });
+            } else {
+              console.log('ℹ️ Remote is also empty, nothing to sync');
+              // 即使远程为空，也更新追踪以避免后续误判
+              await updateBookmarkStructureTracking();
+            }
+          } else {
+            console.log('ℹ️ Remote gist not found, starting fresh');
+            // 更新追踪
+            await updateBookmarkStructureTracking();
+          }
+        } catch (error) {
+          console.error('Initial sync check remote error:', error);
+          // 出错也更新追踪
+          await updateBookmarkStructureTracking();
+        }
+        // 无论如何都启用自动同步
+        await browser.storage.local.set({ initialSyncCompleted: true });
+        console.log('✅ Initial sync completed, auto-sync enabled');
+      } else {
+        // 本地有书签，显示选择对话框
+        console.log(`📊 Found ${localCount} local bookmarks, showing sync choice dialog...`);
+        await browser.storage.local.set({ 
+          pendingInitialSync: true, 
+          localBookmarkCount: localCount 
+        });
+        
+        // 尝试发送消息给options页面
+        try {
+          await browser.runtime.sendMessage({ name: 'showSyncChoice', localCount });
+          console.log('✅ Sync choice message sent to options page');
+        } catch (e) {
+          console.log('⚠️ Options page not open, opening it now...');
+          await browser.runtime.openOptionsPage();
+          // 等待页面加载后重新发送消息
+          setTimeout(async () => {
+            try {
+              await browser.runtime.sendMessage({ name: 'showSyncChoice', localCount });
+              console.log('✅ Sync choice message sent after opening options page');
+            } catch (err) {
+              console.error('Failed to send message even after opening options page:', err);
+            }
+          }, 1000);
+        }
+        
+        // 30秒超时：如果用户没响应，自动启用同步（不做任何操作，保留本地书签）
+        setTimeout(async () => {
+          const { initialSyncCompleted, pendingInitialSync } = await browser.storage.local.get(['initialSyncCompleted', 'pendingInitialSync']);
+          if (!initialSyncCompleted && pendingInitialSync) {
+            console.log('⚠️ Initial sync timeout (30s): Auto-enabling sync, keeping local bookmarks');
+            await browser.storage.local.set({ initialSyncCompleted: true });
+            await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount']);
+            await browser.notifications.create({
+              type: "basic",
+              iconUrl: iconLogo,
+              title: '初始同步',
+              message: '已启用自动同步，保留本地书签。后续变化将自动同步到远程。'
+            });
+          }
+        }, 30000); // 30秒超时
+      }
+    } catch (error) {
+      console.error('performInitialSync error:', error);
+      // 出错也要启用自动同步，不要卡住
+      await browser.storage.local.set({ initialSyncCompleted: true });
     }
   }
 
@@ -419,8 +679,6 @@ export default defineBackground(() => {
   // Auto sync functionality
   let autoSyncTimer: string | null = null;
   let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const DEBOUNCE_DELAY = 2000; // 2秒防抖延迟
   const AUTO_SYNC_INTERVAL = 5000; // 5秒自动同步间隔
   
   // API rate limiting
@@ -459,66 +717,47 @@ export default defineBackground(() => {
   }
 
   /**
-   * 触发自动同步（带防抖机制）
-   * 1. 检查是否正在同步中
-   * 2. 启动2秒防抖计时器
-   * 3. 如果2秒内无新变化，执行智能同步
+   * 触发自动同步（立即执行，无延迟）
+   * 检测到书签变化后立即上传到远程
    */
   async function triggerAutoSyncIfEnabled(): Promise<void> {
     try {
-      console.log('Auto sync check:', {
-        curOperType: curOperType,
-        shouldTrigger: curOperType === OperType.NONE
-      });
+      // Check if initial sync is completed first
+      const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
+      if (!initialSyncCompleted) {
+        console.log('Auto sync check skipped: Waiting for initial sync to complete');
+        return;
+      }
+      
+      console.log('🔄 Auto sync triggered immediately (no delay)');
       
       // Only proceed if we're not currently syncing
       if (curOperType === OperType.NONE) {
-        // Clear existing debounce timer
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-          console.log('Previous debounce timer cleared');
+        try {
+          // Set operation type to prevent multiple simultaneous syncs
+          curOperType = OperType.SYNC;
+          
+          // Show sync in progress badge
+          browser.action.setBadgeText({ text: "↻" });
+          browser.action.setBadgeBackgroundColor({ color: "#007bff" });
+          
+          // Perform smart sync immediately with API rate limiting
+          await smartSync();
+          
+          // Clear badge after sync - remove the warning badge
+          await refreshLocalCount();
+          browser.action.setBadgeText({ text: "" });
+          
+          // Reset operation type
+          curOperType = OperType.NONE;
+        } catch (error) {
+          console.error('Error in auto sync:', error);
+          // Reset operation type on error
+          curOperType = OperType.NONE;
+          browser.action.setBadgeText({ text: "" });
         }
-        
-        // Set new debounce timer (2 seconds)
-        debounceTimer = setTimeout(async () => {
-          try {
-            console.log('Debounce delay completed, triggering auto sync...');
-            
-            // Double-check conditions before sync
-            if (curOperType === OperType.NONE) {
-              // Set operation type to prevent multiple simultaneous syncs
-              curOperType = OperType.SYNC;
-              
-              // Show sync in progress badge
-              browser.action.setBadgeText({ text: "↻" });
-              browser.action.setBadgeBackgroundColor({ color: "#007bff" });
-              
-              // Perform smart sync with API rate limiting
-              await smartSync();
-              
-              // Clear badge after sync
-              browser.action.setBadgeText({ text: "" });
-              browser.action.setBadgeBackgroundColor({ color: "#F00" });
-              
-              // Reset operation type
-              curOperType = OperType.NONE;
-            } else {
-              console.log('Auto sync cancelled during debounce: Currently syncing');
-            }
-          } catch (error) {
-            console.error('Error in debounced auto sync:', error);
-            // Reset operation type on error
-            curOperType = OperType.NONE;
-            browser.action.setBadgeText({ text: "" });
-          } finally {
-            // Clear debounce timer
-            debounceTimer = null;
-          }
-        }, DEBOUNCE_DELAY);
-        
-        console.log(`Auto sync scheduled with ${DEBOUNCE_DELAY}ms debounce delay`);
       } else {
-        console.log('Auto sync not triggered: Currently syncing');
+        console.log('⏸️ Auto sync skipped: Currently syncing');
       }
     } catch (error) {
       console.error('Error triggering auto sync:', error);
@@ -633,6 +872,13 @@ export default defineBackground(() => {
    */
   async function smartSync(): Promise<void> {
     try {
+      // Check GitHub configuration first
+      const setting = await Setting.build();
+      if (!setting.githubToken || !setting.gistID) {
+        console.log('⏸️ Smart sync skipped: GitHub not configured');
+        return;
+      }
+      
       console.log('Starting smart sync...');
       
       // Check API rate limiting
@@ -675,10 +921,17 @@ export default defineBackground(() => {
       const hasChanges = localCount !== remoteCount || localStructure !== remoteStructure;
       
       if (hasChanges) {
-        console.log('Local data differs from remote, uploading...');
+        console.log('✅ Local data differs from remote, uploading...', {
+          localCount,
+          remoteCount,
+          structureDiff: localStructure.length - remoteStructure.length
+        });
         await uploadBookmarks();
+        console.log('✅ Smart sync upload completed');
+        // Update bookmark structure tracking after successful upload
+        await updateBookmarkStructureTracking();
       } else {
-        console.log('Local and remote data are identical, skipping sync');
+        console.log('ℹ️ Local and remote data are identical, skipping sync');
       }
     } catch (error) {
       console.error('Smart sync error:', error);
@@ -709,6 +962,12 @@ export default defineBackground(() => {
       // Create new interval with 5 second interval
       autoSyncInterval = setInterval(async () => {
         try {
+          // Check if initial sync is completed
+          const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
+          if (!initialSyncCompleted) {
+            console.log('Auto sync interval skipped: Waiting for initial sync to complete');
+            return;
+          }
           await smartSync();
         } catch (error) {
           console.error('Error in auto sync interval:', error);
@@ -737,16 +996,12 @@ export default defineBackground(() => {
 
   // Initialize auto sync on startup
   browser.runtime.onStartup.addListener(async () => {
+    console.log('🔧 Extension startup');
     await startAutoSync();
   });
 
   // Clean up timers when extension is suspended or closed
   browser.runtime.onSuspend.addListener(() => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      debounceTimer = null;
-      console.log('Debounce timer cleared on suspend');
-    }
     if (autoSyncInterval) {
       clearInterval(autoSyncInterval);
       autoSyncInterval = null;
