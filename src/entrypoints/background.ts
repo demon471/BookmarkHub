@@ -35,6 +35,7 @@ export default defineBackground(() => {
   let curOperType = OperType.NONE;
   let curBrowserType = BrowserType.CHROME;
   let configChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  let isClearing = false; // 标记是否正在清空书签，防止触发同步
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
       curOperType = OperType.SYNC
@@ -57,11 +58,22 @@ export default defineBackground(() => {
     }
     if (msg.name === 'removeAll') {
       curOperType = OperType.REMOVE
+      isClearing = true; // 设置清空标记
       clearBookmarkTree().then(async () => {
         curOperType = OperType.NONE
         await showSyncBadge('success');
-        refreshLocalCount();
+        await refreshLocalCount();
+        // 清空后重置初始同步状态，让用户重新选择
+        await browser.storage.local.set({ initialSyncCompleted: false });
+        await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount', 'lastBookmarkStructure']);
+        console.log('🗑️ Local bookmarks cleared, initial sync reset');
+        isClearing = false; // 清除标记
         sendResponse(true);
+      }).catch(async (error) => {
+        console.error('Clear bookmarks error:', error);
+        curOperType = OperType.NONE;
+        isClearing = false;
+        sendResponse(false);
       });
 
     }
@@ -129,7 +141,7 @@ export default defineBackground(() => {
     return true;
   });
   browser.bookmarks.onCreated.addListener(async (id, info) => {
-    if (curOperType === OperType.NONE) {
+    if (curOperType === OperType.NONE && !isClearing) {
       // console.log("onCreated", id, info)
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -138,10 +150,12 @@ export default defineBackground(() => {
       await updateBookmarkStructureTracking();
       // Trigger auto sync if enabled
       await triggerAutoSyncIfEnabled();
+    } else if (isClearing) {
+      console.log('⏸️ Bookmark created during clear operation, skipping sync');
     }
   });
   browser.bookmarks.onChanged.addListener(async (id, info) => {
-    if (curOperType === OperType.NONE) {
+    if (curOperType === OperType.NONE && !isClearing) {
       // console.log("onChanged", id, info)
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -149,10 +163,12 @@ export default defineBackground(() => {
       await updateBookmarkStructureTracking();
       // Trigger auto sync if enabled
       await triggerAutoSyncIfEnabled();
+    } else if (isClearing) {
+      console.log('⏸️ Bookmark changed during clear operation, skipping sync');
     }
   })
   browser.bookmarks.onMoved.addListener(async (id, info) => {
-    if (curOperType === OperType.NONE) {
+    if (curOperType === OperType.NONE && !isClearing) {
       // console.log("onMoved", id, info)
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -160,10 +176,12 @@ export default defineBackground(() => {
       await updateBookmarkStructureTracking();
       // Trigger auto sync if enabled
       await triggerAutoSyncIfEnabled();
+    } else if (isClearing) {
+      console.log('⏸️ Bookmark moved during clear operation, skipping sync');
     }
   })
   browser.bookmarks.onRemoved.addListener(async (id, info) => {
-    if (curOperType === OperType.NONE) {
+    if (curOperType === OperType.NONE && !isClearing) {
       console.log("Bookmark removed:", id, info);
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -172,6 +190,8 @@ export default defineBackground(() => {
       await updateBookmarkStructureTracking();
       // Trigger auto sync if enabled
       await triggerAutoSyncIfEnabled();
+    } else if (isClearing) {
+      console.log('⏸️ Bookmark removed during clear operation, skipping sync');
     }
   })
 
@@ -337,7 +357,10 @@ export default defineBackground(() => {
           }
           return;
         }
+        // 设置清空标志，防止下载过程中的删除操作触发同步
+        isClearing = true;
         await clearBookmarkTree();
+        isClearing = false;
         await createBookmarkTree(syncdata.bookmarks);
         const count = getBookmarkCount(syncdata.bookmarks);
         await browser.storage.local.set({ remoteCount: count });
@@ -370,6 +393,7 @@ export default defineBackground(() => {
     }
     catch (error: any) {
       console.error(error);
+      isClearing = false; // 确保错误时也清除标志
       await showSyncBadge('error');
       
       // 只在配置问题时显示一次提示

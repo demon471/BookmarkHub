@@ -38,7 +38,14 @@ const Popup: React.FC = () => {
             <Dropdown.Menu show>
                 <Dropdown.Item name='upload' as="button" title={browser.i18n.getMessage('uploadBookmarksDesc')}><AiOutlineCloudUpload />{browser.i18n.getMessage('uploadBookmarks')}</Dropdown.Item>
                 <Dropdown.Item name='download' as="button" title={browser.i18n.getMessage('downloadBookmarksDesc')}><AiOutlineCloudDownload />{browser.i18n.getMessage('downloadBookmarks')}</Dropdown.Item>
-                <Dropdown.Item name='removeAll' as="button" title={browser.i18n.getMessage('removeAllBookmarksDesc')}><AiOutlineClear />{browser.i18n.getMessage('removeAllBookmarks')}</Dropdown.Item>
+                <Dropdown.Item 
+                    name='removeAll' 
+                    as="button" 
+                    title={browser.i18n.getMessage('removeAllBookmarksDesc')}
+                    style={{ color: '#dc3545' }}
+                >
+                    <AiOutlineClear />{browser.i18n.getMessage('removeAllBookmarks')}
+                </Dropdown.Item>
                 <Dropdown.Divider />
                 <Dropdown.Item name='setting' as="button"><AiOutlineSetting />{browser.i18n.getMessage('settings')}</Dropdown.Item>
                 <Dropdown.ItemText>

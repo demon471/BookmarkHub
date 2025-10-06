@@ -10,15 +10,19 @@ const Popup: React.FC = () => {
     const { register, setValue, handleSubmit } = useForm();
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
+    const [importMessage, setImportMessage] = useState('');
+    
+    const loadConfig = async () => {
+        // 加载现有配置
+        const options = await optionsStorage.getAll();
+        setValue('githubToken', options.githubToken || '');
+        setValue('gistID', options.gistID || '');
+        setValue('gistFileName', options.gistFileName || 'BookmarkHub');
+        setValue('enableNotify', options.enableNotify !== false);
+    };
     
     useEffect(() => {
-        // 加载现有配置
-        optionsStorage.getAll().then((options: any) => {
-            setValue('githubToken', options.githubToken || '');
-            setValue('gistID', options.gistID || '');
-            setValue('gistFileName', options.gistFileName || 'BookmarkHub');
-            setValue('enableNotify', options.enableNotify !== false);
-        });
+        loadConfig();
     }, []);
 
     const onSubmit = async (data: any) => {
@@ -74,6 +78,108 @@ const Popup: React.FC = () => {
         }
     };
 
+    const handleExportConfig = async () => {
+        try {
+            const config = await optionsStorage.getAll();
+            const exportData = {
+                version: '1.0',
+                timestamp: new Date().toISOString(),
+                config: {
+                    githubToken: config.githubToken || '',
+                    gistID: config.gistID || '',
+                    gistFileName: config.gistFileName || 'BookmarkHub',
+                    enableNotify: config.enableNotify !== false
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bookmarkhub-config-${new Date().getTime()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            setSaveMessage('✅ 配置已导出！');
+            setTimeout(() => setSaveMessage(''), 3000);
+        } catch (error) {
+            console.error('Export config error:', error);
+            setSaveMessage('❌ 导出失败');
+            setTimeout(() => setSaveMessage(''), 3000);
+        }
+    };
+
+    const handleImportConfig = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        
+        setImportMessage('');
+        try {
+            const text = await file.text();
+            const importData = JSON.parse(text);
+            
+            if (!importData.config) {
+                throw new Error('Invalid config file format');
+            }
+            
+            const configData = {
+                githubToken: importData.config.githubToken || '',
+                gistID: importData.config.gistID || '',
+                gistFileName: importData.config.gistFileName || 'BookmarkHub',
+                enableNotify: importData.config.enableNotify !== false
+            };
+            
+            // 保存导入的配置
+            await optionsStorage.set(configData);
+            
+            // 重新加载配置到表单
+            await loadConfig();
+            
+            console.log('✅ Configuration imported:', {
+                hasToken: !!configData.githubToken,
+                hasGistID: !!configData.gistID,
+                fileName: configData.gistFileName
+            });
+            
+            setImportMessage('✅ 配置已导入！正在检查初始同步...');
+            
+            // 等待一下让storage.onChanged触发
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            // 检查初始同步状态
+            const { initialSyncCompleted, pendingInitialSync } = await browser.storage.local.get(['initialSyncCompleted', 'pendingInitialSync']);
+            
+            console.log('Initial sync status after import:', {
+                initialSyncCompleted,
+                pendingInitialSync
+            });
+            
+            if (!initialSyncCompleted && !pendingInitialSync) {
+                // 如果初始同步没有完成且没有pending，手动触发
+                console.log('⚠️ Initial sync not triggered automatically, triggering manually...');
+                
+                // 发送消息到background让它执行初始同步
+                try {
+                    await browser.runtime.sendMessage({ name: 'triggerInitialSync' });
+                } catch (err) {
+                    console.error('Failed to trigger initial sync:', err);
+                }
+            }
+            
+            setImportMessage('✅ 配置已导入！');
+            setTimeout(() => setImportMessage(''), 3000);
+        } catch (error) {
+            console.error('Import config error:', error);
+            setImportMessage('❌ 导入失败：配置文件格式错误');
+            setTimeout(() => setImportMessage(''), 5000);
+        }
+        
+        // 清除文件选择
+        event.target.value = '';
+    };
+
     return (
         <Container>
             <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)}>
@@ -116,16 +222,41 @@ const Popup: React.FC = () => {
                 <Form.Group as={Row}>
                     <Form.Label column="sm" sm={3} lg={2} xs={3}></Form.Label>
                     <Col sm={9} lg={10} xs={9}>
-                        <Button type="submit" variant="primary" disabled={saving} size="sm" style={{ marginRight: '10px' }}>
-                            {saving ? '保存中...' : '💾 保存配置'}
-                        </Button>
-                        {saveMessage && <span style={{ color: saveMessage.startsWith('✅') ? 'green' : 'red' }}>{saveMessage}</span>}
-                    </Col>
-                </Form.Group>
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}></Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <a href="https://github.com/dudor/BookmarkHub" target="_blank">{browser.i18n.getMessage('help')}</a>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <Button type="submit" variant="primary" disabled={saving} size="sm">
+                                {saving ? '保存中...' : '💾 保存配置'}
+                            </Button>
+                            <Button 
+                                type="button" 
+                                variant="success" 
+                                size="sm" 
+                                onClick={handleExportConfig}
+                            >
+                                📤 导出配置
+                            </Button>
+                            <label htmlFor="importConfigFile" style={{ margin: 0 }}>
+                                <Button 
+                                    type="button" 
+                                    variant="info" 
+                                    size="sm"
+                                    as="span"
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    📥 导入配置
+                                </Button>
+                            </label>
+                            <input 
+                                id="importConfigFile"
+                                type="file" 
+                                accept=".json"
+                                onChange={handleImportConfig}
+                                style={{ display: 'none' }}
+                            />
+                        </div>
+                        <div style={{ marginTop: '8px' }}>
+                            {saveMessage && <span style={{ color: saveMessage.startsWith('✅') ? 'green' : 'red', marginRight: '10px' }}>{saveMessage}</span>}
+                            {importMessage && <span style={{ color: importMessage.startsWith('✅') ? 'green' : 'red' }}>{importMessage}</span>}
+                        </div>
                     </Col>
                 </Form.Group>
             </Form>
