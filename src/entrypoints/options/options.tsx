@@ -13,6 +13,7 @@ const Popup: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
     const [importMessage, setImportMessage] = useState('');
+    const [syncing, setSyncing] = useState(false);
     const [folderTree, setFolderTree] = useState<any[] | null>(null);
     const [loadingTree, setLoadingTree] = useState(false);
     const [treeError, setTreeError] = useState('');
@@ -232,6 +233,25 @@ const Popup: React.FC = () => {
         event.target.value = '';
     };
 
+    const handleConfirmUpload = async () => {
+        setSyncing(true);
+        try {
+            const result = await browser.runtime.sendMessage({
+                name: 'upload',
+                selectedFolderIds,
+            });
+
+            // 只有上传成功时才持久化当前选择的文件夹，用于后续自动同步
+            if (result) {
+                await browser.storage.local.set({ selectedFolderIds });
+            }
+        } catch (error) {
+            console.error('Confirm upload error:', error);
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     const collectFolderIdsRecursive = (node: any, acc: string[]) => {
         if (!node || node.url) {
             return;
@@ -423,14 +443,24 @@ const Popup: React.FC = () => {
                     <div className="options-card folder-tree-card">
                         <div className="folder-tree-header">
                             <span className="folder-tree-title">书签文件夹预览</span>
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={loadFolderTree}
-                                disabled={loadingTree}
-                            >
-                                {loadingTree ? '刷新中...' : '刷新'}
-                            </Button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    onClick={loadFolderTree}
+                                    disabled={loadingTree}
+                                >
+                                    {loadingTree ? '刷新中...' : '刷新'}
+                                </Button>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={handleConfirmUpload}
+                                    disabled={syncing || !folderTree}
+                                >
+                                    {syncing ? '上传中...' : '确定'}
+                                </Button>
+                            </div>
                         </div>
                         <div className="folder-tree-body">
                             {treeError && <div className="folder-tree-error">{treeError}</div>}

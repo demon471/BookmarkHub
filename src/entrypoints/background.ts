@@ -34,11 +34,13 @@ export default defineBackground(() => {
   let curOperType = OperType.NONE;
   let curBrowserType = BrowserType.CHROME;
   let configChangeTimer: ReturnType<typeof setTimeout> | null = null;
+  let badgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let isClearing = false; // 标记是否正在清空书签，防止触发同步
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
       curOperType = OperType.SYNC
-      uploadBookmarks().then(() => {
+      const selectedFolderIds = Array.isArray(msg.selectedFolderIds) ? (msg.selectedFolderIds as string[]) : undefined;
+      uploadBookmarks(selectedFolderIds).then(() => {
         curOperType = OperType.NONE
         // Badge handled by uploadBookmarks()
         refreshLocalCount();
@@ -84,7 +86,8 @@ export default defineBackground(() => {
     if (msg.name === 'initialSyncUpload') {
       console.log('📤 Initial sync: Uploading local bookmarks to remote...');
       curOperType = OperType.SYNC;
-      uploadBookmarks().then(async () => {
+      const selectedFolderIds = Array.isArray(msg.selectedFolderIds) ? (msg.selectedFolderIds as string[]) : undefined;
+      uploadBookmarks(selectedFolderIds).then(async () => {
         curOperType = OperType.NONE;
         console.log('✅ Initial sync upload completed');
         await browser.storage.local.set({ initialSyncCompleted: true });
@@ -224,11 +227,82 @@ export default defineBackground(() => {
     }
   });
 
-  async function uploadBookmarks() {
+  async function showSyncBadge(status: 'syncing' | 'success' | 'error') {
+    if (badgeTimeoutId) {
+      clearTimeout(badgeTimeoutId);
+      badgeTimeoutId = null;
+    }
+
+    if (status === 'syncing') {
+      await browser.action.setBadgeText({ text: '…' });
+      await browser.action.setBadgeBackgroundColor({ color: '#007bff' });
+    } else if (status === 'success') {
+      await browser.action.setBadgeText({ text: '' });
+    } else {
+      await browser.action.setBadgeText({ text: '!' });
+      await browser.action.setBadgeBackgroundColor({ color: '#dc3545' });
+      badgeTimeoutId = setTimeout(async () => {
+        await browser.action.setBadgeText({ text: '' });
+      }, 5000);
+    }
+  }
+
+  function filterBookmarksBySelectedFolders(roots: BookmarkInfo[], selectedFolderIds: string[]): BookmarkInfo[] {
+    // 过滤掉仅包含根 id("0") 的情况，此时不做任何过滤
+    const effectiveIds = selectedFolderIds.filter(id => id && id !== '0');
+    if (effectiveIds.length === 0) {
+      return roots;
+    }
+
+    const selectedIdSet = new Set(effectiveIds);
+
+    const dfs = (node: BookmarkInfo, parentSelected: boolean): BookmarkInfo | null => {
+      const id = node.id ?? '';
+      const hasChildren = !!(node.children && node.children.length);
+      const isSelectedHere = selectedIdSet.has(id);
+      const underSelected = parentSelected || isSelectedHere;
+
+      if (hasChildren) {
+        const children = node.children || [];
+        const filteredChildren: BookmarkInfo[] = [];
+        for (const child of children) {
+          const filteredChild = dfs(child, underSelected);
+          if (filteredChild) {
+            filteredChildren.push(filteredChild);
+          }
+        }
+
+        // 如果当前文件夹本身未选中且子级也都被过滤掉，则整个分支丢弃
+        if (!underSelected && filteredChildren.length === 0) {
+          return null;
+        }
+
+        // 保留当前节点，但只保留过滤后的子节点
+        return { ...node, children: filteredChildren };
+      } else {
+        // 书签叶子节点：只有在位于被选中文件夹之下时才保留
+        if (!underSelected) {
+          return null;
+        }
+        return node;
+      }
+    };
+
+    const result: BookmarkInfo[] = [];
+    for (const root of roots) {
+      const filteredRoot = dfs(root, false);
+      if (filteredRoot) {
+        result.push(filteredRoot);
+      }
+    }
+    return result;
+  }
+
+  async function uploadBookmarks(selectedFolderIds?: string[]) {
     try {
       console.log('Starting upload bookmarks...');
       await showSyncBadge('syncing');
-      
+
       let setting = await Setting.build()
       console.log('Setting loaded:', {
         hasToken: !!setting.githubToken,
@@ -237,7 +311,7 @@ export default defineBackground(() => {
         gistID: setting.gistID,
         fileName: setting.gistFileName
       });
-      
+
       if (setting.githubToken == '') {
         throw new Error("Gist Token Not Found");
       }
@@ -247,23 +321,37 @@ export default defineBackground(() => {
       if (setting.gistFileName == '') {
         throw new Error("Gist File Not Found");
       }
-      
+
       let bookmarks = await getBookmarks();
       console.log('Bookmarks loaded:', bookmarks.length, 'items');
-      
+
+      // 如果没有显式传入过滤条件，则尝试从本地读取最近一次确认时保存的 selectedFolderIds
+      let effectiveSelectedIds = selectedFolderIds;
+      if (!effectiveSelectedIds || effectiveSelectedIds.length === 0) {
+        const stored = await browser.storage.local.get(['selectedFolderIds']);
+        if (Array.isArray(stored.selectedFolderIds)) {
+          effectiveSelectedIds = stored.selectedFolderIds as string[];
+        }
+      }
+
+      if (effectiveSelectedIds && effectiveSelectedIds.length) {
+        bookmarks = filterBookmarksBySelectedFolders(bookmarks, effectiveSelectedIds);
+        console.log('Bookmarks after folder filter:', bookmarks.length, 'items');
+      }
+
       let syncdata = new SyncDataInfo();
       syncdata.version = browser.runtime.getManifest().version;
       syncdata.createDate = Date.now();
       syncdata.bookmarks = formatBookmarks(bookmarks);
       syncdata.browser = navigator.userAgent;
-      
+
       console.log('Sync data prepared:', {
         version: syncdata.version,
         createDate: new Date(syncdata.createDate),
         bookmarksCount: syncdata.bookmarks?.length || 0,
         dataSize: JSON.stringify(syncdata).length
       });
-      
+
       const updateData = {
         files: {
           [setting.gistFileName]: {
@@ -560,6 +648,251 @@ export default defineBackground(() => {
   browser.runtime.onSuspend.addListener(() => {
     console.log('Extension suspended');
   });
+
+  async function getBookmarks() {
+    const bookmarkTree = await browser.bookmarks.getTree() as unknown as BookmarkInfo[];
+    if (bookmarkTree && bookmarkTree[0] && bookmarkTree[0].id === 'root________') {
+      curBrowserType = BrowserType.FIREFOX;
+    } else {
+      curBrowserType = BrowserType.CHROME;
+    }
+    return bookmarkTree;
+  }
+
+  async function refreshLocalCount() {
+    const bookmarkList = await getBookmarks();
+    const count = getBookmarkCount(bookmarkList);
+    await browser.storage.local.set({ localCount: count });
+  }
+
+  function formatBookmarks(bookmarks: BookmarkInfo[]): BookmarkInfo[] | undefined {
+    if (bookmarks[0] && bookmarks[0].children) {
+      for (const a of bookmarks[0].children) {
+        switch (a.id) {
+          case '1':
+          case 'toolbar_____':
+            a.title = RootBookmarksType.ToolbarFolder;
+            break;
+          case 'menu________':
+            a.title = RootBookmarksType.MenuFolder;
+            break;
+          case '2':
+          case 'unfiled_____':
+            a.title = RootBookmarksType.UnfiledFolder;
+            break;
+          case '3':
+          case 'mobile______':
+            a.title = RootBookmarksType.MobileFolder;
+            break;
+        }
+      }
+    }
+    const root = format(bookmarks[0]);
+    return root.children;
+  }
+
+  function format(b: BookmarkInfo): BookmarkInfo {
+    b.dateAdded = undefined;
+    b.dateGroupModified = undefined;
+    b.id = undefined;
+    b.index = undefined;
+    b.parentId = undefined;
+    b.type = undefined;
+    if (b.children) {
+      b.children = b.children.map(child => format(child));
+    }
+    return b;
+  }
+
+  function getBookmarkCount(bookmarks: BookmarkInfo[] | BookmarkInfo | undefined): number {
+    if (!bookmarks) {
+      return 0;
+    }
+    const list = Array.isArray(bookmarks) ? bookmarks : [bookmarks];
+    let count = 0;
+    const stack: BookmarkInfo[] = [...list];
+    while (stack.length) {
+      const node = stack.pop()!;
+      if (node.url && !node.children) {
+        count += 1;
+      }
+      if (node.children) {
+        for (const child of node.children) {
+          stack.push(child);
+        }
+      }
+    }
+    return count;
+  }
+
+  async function clearBookmarkTree() {
+    try {
+      const setting = await Setting.build();
+      if (!setting.githubToken) {
+        throw new Error('Gist Token Not Found');
+      }
+      if (!setting.gistID) {
+        throw new Error('Gist ID Not Found');
+      }
+      if (!setting.gistFileName) {
+        throw new Error('Gist File Not Found');
+      }
+
+      const bookmarks = await getBookmarks();
+      const tempNodes: BookmarkInfo[] = [];
+      if (bookmarks[0] && bookmarks[0].children) {
+        for (const c of bookmarks[0].children) {
+          if (c.children) {
+            for (const d of c.children) {
+              tempNodes.push(d);
+            }
+          }
+        }
+      }
+
+      for (const node of tempNodes) {
+        if (node.id) {
+          await browser.bookmarks.removeTree(node.id);
+        }
+      }
+
+      if (curOperType === OperType.REMOVE && setting.enableNotify) {
+        await browser.notifications.create({
+          type: 'basic',
+          iconUrl: iconLogo,
+          title: browser.i18n.getMessage('removeAllBookmarks'),
+          message: browser.i18n.getMessage('success'),
+        });
+      }
+    } catch (error: any) {
+      console.error('Clear bookmarks error:', error);
+      await browser.notifications.create({
+        type: 'basic',
+        iconUrl: iconLogo,
+        title: browser.i18n.getMessage('removeAllBookmarks'),
+        message: `${browser.i18n.getMessage('error')}：${error.message}`,
+      });
+    }
+  }
+
+  async function createBookmarkTree(bookmarkList: BookmarkInfo[] | undefined) {
+    if (!bookmarkList) {
+      return;
+    }
+    for (let i = 0; i < bookmarkList.length; i++) {
+      const node = bookmarkList[i];
+      if (
+        node.title === RootBookmarksType.MenuFolder ||
+        node.title === RootBookmarksType.MobileFolder ||
+        node.title === RootBookmarksType.ToolbarFolder ||
+        node.title === RootBookmarksType.UnfiledFolder
+      ) {
+        if (curBrowserType === BrowserType.FIREFOX) {
+          switch (node.title) {
+            case RootBookmarksType.MenuFolder:
+              node.children?.forEach(c => (c.parentId = 'menu________'));
+              break;
+            case RootBookmarksType.MobileFolder:
+              node.children?.forEach(c => (c.parentId = 'mobile______'));
+              break;
+            case RootBookmarksType.ToolbarFolder:
+              node.children?.forEach(c => (c.parentId = 'toolbar_____'));
+              break;
+            case RootBookmarksType.UnfiledFolder:
+              node.children?.forEach(c => (c.parentId = 'unfiled_____'));
+              break;
+            default:
+              node.children?.forEach(c => (c.parentId = 'unfiled_____'));
+              break;
+          }
+        } else {
+          switch (node.title) {
+            case RootBookmarksType.MobileFolder:
+              node.children?.forEach(c => (c.parentId = '3'));
+              break;
+            case RootBookmarksType.ToolbarFolder:
+              node.children?.forEach(c => (c.parentId = '1'));
+              break;
+            case RootBookmarksType.UnfiledFolder:
+            case RootBookmarksType.MenuFolder:
+              node.children?.forEach(c => (c.parentId = '2'));
+              break;
+            default:
+              node.children?.forEach(c => (c.parentId = '2'));
+              break;
+          }
+        }
+        await createBookmarkTree(node.children);
+        continue;
+      }
+
+      let res: Bookmarks.BookmarkTreeNode = { id: '', title: '' };
+      try {
+        res = await browser.bookmarks.create({
+          parentId: node.parentId,
+          title: node.title,
+          url: node.url,
+        });
+      } catch (err) {
+        console.error(res, err);
+      }
+      if (res.id && node.children && node.children.length > 0) {
+        node.children.forEach(c => (c.parentId = res.id));
+        await createBookmarkTree(node.children);
+      }
+    }
+  }
+
+  async function updateBookmarkStructureTracking(): Promise<void> {
+    try {
+      const bookmarks = await getBookmarks();
+      const currentCount = getBookmarkCount(bookmarks);
+      const currentStructure = JSON.stringify(formatBookmarks(bookmarks));
+      await browser.storage.local.set({
+        localBookmarkCount: currentCount,
+        lastBookmarkStructure: currentStructure,
+      });
+    } catch (error) {
+      console.error('Error updating bookmark structure tracking:', error);
+    }
+  }
+
+  async function updateLastSyncTime(): Promise<void> {
+    try {
+      const currentTime = Date.now();
+      await browser.storage.local.set({ lastSyncTime: currentTime });
+    } catch (error) {
+      console.error('Error updating last sync time:', error);
+    }
+  }
+
+  async function triggerAutoSyncIfEnabled(): Promise<void> {
+    try {
+      const setting = await Setting.build();
+      if (!setting.autoSyncEnabled) {
+        return;
+      }
+      const data = await browser.storage.local.get(['lastSyncTime']);
+      const lastSyncTime = data.lastSyncTime || 0;
+      const intervalMinutes = setting.autoSyncInterval || 15;
+      const intervalMs = intervalMinutes * 60 * 1000;
+      const now = Date.now();
+      if (lastSyncTime && now - lastSyncTime < intervalMs) {
+        return;
+      }
+      if (curOperType !== OperType.NONE) {
+        return;
+      }
+      curOperType = OperType.SYNC;
+      try {
+        await uploadBookmarks();
+      } finally {
+        curOperType = OperType.NONE;
+      }
+    } catch (error) {
+      console.error('Error triggering auto sync:', error);
+    }
+  }
 
   ///暂时不启用自动备份
   /*
