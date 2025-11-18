@@ -6,12 +6,47 @@ import { useForm } from "react-hook-form";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './options.css'
 import optionsStorage from '../../utils/optionsStorage'
+
 const Popup: React.FC = () => {
+
     const { register, setValue, handleSubmit } = useForm();
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
     const [importMessage, setImportMessage] = useState('');
-    
+    const [folderTree, setFolderTree] = useState<any[] | null>(null);
+    const [loadingTree, setLoadingTree] = useState(false);
+    const [treeError, setTreeError] = useState('');
+    const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
+    const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
+
+    const buildFolderMeta = (nodes: any[] | null) => {
+        const counts: { [id: string]: number } = {};
+        const ids: string[] = [];
+
+        const dfs = (node: any): number => {
+            if (node.url) {
+                return 1;
+            }
+            let total = 0;
+            if (node.children && node.children.length) {
+                for (const child of node.children) {
+                    total += dfs(child);
+                }
+            }
+            ids.push(node.id);
+            counts[node.id] = total;
+            return total;
+        };
+
+        if (nodes) {
+            for (const node of nodes) {
+                dfs(node);
+            }
+        }
+
+        return { counts, ids };
+    };
+
     const loadConfig = async () => {
         // 加载现有配置
         const options = await optionsStorage.getAll();
@@ -20,10 +55,27 @@ const Popup: React.FC = () => {
         setValue('gistFileName', options.gistFileName || 'BookmarkHub');
         setValue('enableNotify', options.enableNotify !== false);
     };
-    
-    useEffect(() => {
-        loadConfig();
-    }, []);
+
+    const loadFolderTree = async () => {
+        setLoadingTree(true);
+        setTreeError('');
+        try {
+            const tree = await browser.bookmarks.getTree();
+            if (tree && tree[0]) {
+                tree[0].title = '根';
+            }
+            const { counts, ids } = buildFolderMeta(tree);
+            setFolderBookmarkCount(counts);
+            setSelectedFolderIds(ids);
+            setFolderTree(tree);
+
+        } catch (error) {
+            console.error('Load folder tree error:', error);
+            setTreeError('无法加载书签文件夹');
+        } finally {
+            setLoadingTree(false);
+        }
+    };
 
     const onSubmit = async (data: any) => {
         setSaving(true);
@@ -36,30 +88,30 @@ const Popup: React.FC = () => {
                 gistFileName: data.gistFileName || 'BookmarkHub',
                 enableNotify: data.enableNotify !== false
             });
-            
+
             console.log('✅ Configuration saved:', {
                 hasToken: !!data.githubToken,
                 hasGistID: !!data.gistID,
                 fileName: data.gistFileName
             });
-            
+
             setSaveMessage('✅ 配置已保存！正在检查初始同步...');
-            
+
             // 等待一下让storage.onChanged触发
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
+
             // 检查初始同步状态
             const { initialSyncCompleted, pendingInitialSync } = await browser.storage.local.get(['initialSyncCompleted', 'pendingInitialSync']);
-            
+
             console.log('Initial sync status:', {
                 initialSyncCompleted,
                 pendingInitialSync
             });
-            
+
             if (!initialSyncCompleted && !pendingInitialSync) {
                 // 如果初始同步没有完成且没有pending，手动触发
                 console.log('⚠️ Initial sync not triggered automatically, triggering manually...');
-                
+
                 // 发送消息到background让它执行初始同步
                 try {
                     await browser.runtime.sendMessage({ name: 'triggerInitialSync' });
@@ -67,7 +119,7 @@ const Popup: React.FC = () => {
                     console.error('Failed to trigger initial sync:', err);
                 }
             }
-            
+
             setSaveMessage('✅ 配置已保存！');
             setTimeout(() => setSaveMessage(''), 3000);
         } catch (error) {
@@ -91,7 +143,7 @@ const Popup: React.FC = () => {
                     enableNotify: config.enableNotify !== false
                 }
             };
-            
+
             const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -101,7 +153,7 @@ const Popup: React.FC = () => {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
+
             setSaveMessage('✅ 配置已导出！');
             setTimeout(() => setSaveMessage(''), 3000);
         } catch (error) {
@@ -114,52 +166,52 @@ const Popup: React.FC = () => {
     const handleImportConfig = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-        
+
         setImportMessage('');
         try {
             const text = await file.text();
             const importData = JSON.parse(text);
-            
+
             if (!importData.config) {
                 throw new Error('Invalid config file format');
             }
-            
+
             const configData = {
                 githubToken: importData.config.githubToken || '',
                 gistID: importData.config.gistID || '',
                 gistFileName: importData.config.gistFileName || 'BookmarkHub',
                 enableNotify: importData.config.enableNotify !== false
             };
-            
+
             // 保存导入的配置
             await optionsStorage.set(configData);
-            
+
             // 重新加载配置到表单
             await loadConfig();
-            
+
             console.log('✅ Configuration imported:', {
                 hasToken: !!configData.githubToken,
                 hasGistID: !!configData.gistID,
                 fileName: configData.gistFileName
             });
-            
+
             setImportMessage('✅ 配置已导入！正在检查初始同步...');
-            
+
             // 等待一下让storage.onChanged触发
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
+
             // 检查初始同步状态
             const { initialSyncCompleted, pendingInitialSync } = await browser.storage.local.get(['initialSyncCompleted', 'pendingInitialSync']);
-            
+
             console.log('Initial sync status after import:', {
                 initialSyncCompleted,
                 pendingInitialSync
             });
-            
+
             if (!initialSyncCompleted && !pendingInitialSync) {
                 // 如果初始同步没有完成且没有pending，手动触发
                 console.log('⚠️ Initial sync not triggered automatically, triggering manually...');
-                
+
                 // 发送消息到background让它执行初始同步
                 try {
                     await browser.runtime.sendMessage({ name: 'triggerInitialSync' });
@@ -167,7 +219,7 @@ const Popup: React.FC = () => {
                     console.error('Failed to trigger initial sync:', err);
                 }
             }
-            
+
             setImportMessage('✅ 配置已导入！');
             setTimeout(() => setImportMessage(''), 3000);
         } catch (error) {
@@ -175,91 +227,223 @@ const Popup: React.FC = () => {
             setImportMessage('❌ 导入失败：配置文件格式错误');
             setTimeout(() => setImportMessage(''), 5000);
         }
-        
+
         // 清除文件选择
         event.target.value = '';
     };
 
-    return (
-        <Container>
-            <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)}>
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('githubToken')}</Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <InputGroup size="sm">
-                            <Form.Control name="githubToken" ref={register} type="text" placeholder="github token" size="sm" />
-                            <InputGroup.Append>
-                                <Button variant="outline-secondary" as="a" target="_blank" href="https://github.com/settings/tokens/new" size="sm">Get Token</Button>
-                            </InputGroup.Append>
-                        </InputGroup>
-                    </Col>
-                </Form.Group>
+    const collectFolderIdsRecursive = (node: any, acc: string[]) => {
+        if (!node || node.url) {
+            return;
+        }
+        acc.push(node.id);
+        if (node.children && node.children.length) {
+            for (const child of node.children) {
+                if (!child.url) {
+                    collectFolderIdsRecursive(child, acc);
+                }
+            }
+        }
+    };
 
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistID')}</Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <Form.Control name="gistID" ref={register} type="text" placeholder="gist ID" size="sm" />
-                    </Col>
-                </Form.Group>
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistFileName')}</Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <Form.Control name="gistFileName" ref={register} type="text" placeholder="gist file name" size="sm" defaultValue="BookmarkHub" />
-                    </Col>
-                </Form.Group>
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('enableNotifications')}</Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <Form.Check
-                            id="enableNotify"
-                            name="enableNotify"
-                            ref={register}
-                            type="switch"
-                            defaultChecked={true}
-                        />
-                    </Col>
-                </Form.Group>
-                <Form.Group as={Row}>
-                    <Form.Label column="sm" sm={3} lg={2} xs={3}></Form.Label>
-                    <Col sm={9} lg={10} xs={9}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            <Button type="submit" variant="primary" disabled={saving} size="sm">
-                                {saving ? '保存中...' : '💾 保存配置'}
-                            </Button>
-                            <Button 
-                                type="button" 
-                                variant="success" 
-                                size="sm" 
-                                onClick={handleExportConfig}
+    const findFolderNodeById = (nodes: any[] | null, id: string): any | null => {
+        if (!nodes) {
+            return null;
+        }
+        const stack = [...nodes];
+        while (stack.length) {
+            const node = stack.pop();
+            if (!node || node.url) {
+                continue;
+            }
+            if (node.id === id) {
+                return node;
+            }
+            if (node.children && node.children.length) {
+                for (const child of node.children) {
+                    stack.push(child);
+                }
+            }
+        }
+        return null;
+    };
+
+    const getDescendantFolderIds = (nodes: any[] | null, id: string): string[] => {
+        const target = findFolderNodeById(nodes, id);
+        if (!target) {
+            return [id];
+        }
+        const result: string[] = [];
+        collectFolderIdsRecursive(target, result);
+        return result;
+    };
+
+    const handleToggleFolder = (id: string) => {
+        const idsToToggle = getDescendantFolderIds(folderTree, id);
+        setSelectedFolderIds(prev => {
+            const allSelected = idsToToggle.every(folderId => prev.includes(folderId));
+            if (allSelected) {
+                return prev.filter(x => !idsToToggle.includes(x));
+            }
+            const nextSet = new Set(prev);
+            idsToToggle.forEach(folderId => nextSet.add(folderId));
+            return Array.from(nextSet);
+        });
+    };
+
+    const renderFolderNodes = (nodes: any[] | undefined) => {
+
+        if (!nodes || nodes.length === 0) {
+            return null;
+        }
+        return (
+            <ul className="folder-tree-list">
+                {nodes.map(node => {
+                    if (node.url) {
+                        return null;
+                    }
+                    const hasChildFolder = node.children && node.children.some(child => !child.url);
+                    return (
+                        <li key={node.id}>
+                            <div className="folder-tree-item">
+                                <div className="folder-tree-main">
+                                    <input
+                                        type="checkbox"
+                                        className="folder-checkbox"
+                                        checked={selectedFolderIds.includes(node.id)}
+                                        onChange={() => handleToggleFolder(node.id)}
+                                    />
+                                    <span className="folder-icon" />
+                                    <span className="folder-title">{node.title || '(未命名文件夹)'}</span>
+                                </div>
+                                <span className="folder-count">{folderBookmarkCount[node.id] ?? 0}</span>
+                            </div>
+                            {hasChildFolder && renderFolderNodes(node.children)}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    };
+
+    useEffect(() => {
+        loadConfig();
+        loadFolderTree();
+    }, []);
+
+    return (
+        <Container className="options-root">
+            <Row className="options-layout">
+                <Col xs={12} md={5} lg={5} className="options-col">
+                    <div className="options-card">
+                        <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)}>
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('githubToken')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <InputGroup size="sm">
+                                        <Form.Control name="githubToken" ref={register} type="text" placeholder="github token" size="sm" />
+                                        <InputGroup.Append>
+                                            <Button variant="outline-secondary" as="a" target="_blank" href="https://github.com/settings/tokens/new" size="sm">Get Token</Button>
+                                        </InputGroup.Append>
+                                    </InputGroup>
+                                </Col>
+                            </Form.Group>
+
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistID')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <Form.Control name="gistID" ref={register} type="text" placeholder="gist ID" size="sm" />
+                                </Col>
+                            </Form.Group>
+
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistFileName')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <Form.Control name="gistFileName" ref={register} type="text" placeholder="gist file name" size="sm" defaultValue="BookmarkHub" />
+                                </Col>
+                            </Form.Group>
+
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('enableNotifications')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <Form.Check
+                                        id="enableNotify"
+                                        name="enableNotify"
+                                        ref={register}
+                                        type="switch"
+                                        defaultChecked={true}
+                                    />
+                                </Col>
+                            </Form.Group>
+
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}></Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                        <Button type="submit" variant="primary" disabled={saving} size="sm">
+                                            {saving ? '保存中...' : '💾 保存配置'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="success"
+                                            size="sm"
+                                            onClick={handleExportConfig}
+                                        >
+                                            📤 导出配置
+                                        </Button>
+                                        <label htmlFor="importConfigFile" style={{ margin: 0 }}>
+                                            <Button
+                                                type="button"
+                                                variant="info"
+                                                size="sm"
+                                                as="span"
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                📥 导入配置
+                                            </Button>
+                                        </label>
+                                        <input
+                                            id="importConfigFile"
+                                            type="file"
+                                            accept=".json"
+                                            onChange={handleImportConfig}
+                                            style={{ display: 'none' }}
+                                        />
+                                    </div>
+                                    <div style={{ marginTop: '8px' }}>
+                                        {saveMessage && <span style={{ color: saveMessage.startsWith('✅') ? 'green' : 'red', marginRight: '10px' }}>{saveMessage}</span>}
+                                        {importMessage && <span style={{ color: importMessage.startsWith('✅') ? 'green' : 'red' }}>{importMessage}</span>}
+                                    </div>
+                                </Col>
+                            </Form.Group>
+                        </Form>
+                    </div>
+                </Col>
+                <Col xs={12} md={7} lg={7} className="options-col">
+                    <div className="options-card folder-tree-card">
+                        <div className="folder-tree-header">
+                            <span className="folder-tree-title">书签文件夹预览</span>
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={loadFolderTree}
+                                disabled={loadingTree}
                             >
-                                📤 导出配置
+                                {loadingTree ? '刷新中...' : '刷新'}
                             </Button>
-                            <label htmlFor="importConfigFile" style={{ margin: 0 }}>
-                                <Button 
-                                    type="button" 
-                                    variant="info" 
-                                    size="sm"
-                                    as="span"
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    📥 导入配置
-                                </Button>
-                            </label>
-                            <input 
-                                id="importConfigFile"
-                                type="file" 
-                                accept=".json"
-                                onChange={handleImportConfig}
-                                style={{ display: 'none' }}
-                            />
                         </div>
-                        <div style={{ marginTop: '8px' }}>
-                            {saveMessage && <span style={{ color: saveMessage.startsWith('✅') ? 'green' : 'red', marginRight: '10px' }}>{saveMessage}</span>}
-                            {importMessage && <span style={{ color: importMessage.startsWith('✅') ? 'green' : 'red' }}>{importMessage}</span>}
+                        <div className="folder-tree-body">
+                            {treeError && <div className="folder-tree-error">{treeError}</div>}
+                            {!treeError && !folderTree && loadingTree && (
+                                <div className="folder-tree-empty">正在加载书签...</div>
+                            )}
+                            {!treeError && folderTree && !loadingTree && (
+                                renderFolderNodes(folderTree) || <div className="folder-tree-empty">没有找到任何书签文件夹。</div>
+                            )}
                         </div>
-                    </Col>
-                </Form.Group>
-            </Form>
+                    </div>
+                </Col>
+            </Row>
         </Container >
     )
 }

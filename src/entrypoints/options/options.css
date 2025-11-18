@@ -1,4 +1,158 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
 #root {
-    margin: 10px;
-    width: 500px;
+  margin: 16px auto;
+  width: 100%;
+  max-width: 1440px;
+  padding: 0 0 20px;
+  box-sizing: border-box;
+}
+
+.options-root {
+  padding-top: 8px;
+  width: 100%;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.options-layout {
+  align-items: stretch;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.options-col {
+  display: flex;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.options-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.folder-tree-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.folder-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.folder-tree-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.folder-tree-body {
+  flex: 1;
+  min-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 4px;
+  border-radius: 6px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.folder-tree-list {
+  list-style: none;
+  padding-left: 14px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.folder-tree-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.folder-tree-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.folder-checkbox {
+  margin-right: 2px;
+}
+
+.folder-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 4px;
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+  border: 1px solid #d97706;
+  flex-shrink: 0;
+}
+
+.folder-title {
+  color: #111827;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.folder-count {
+  font-size: 12px;
+  color: #6b7280;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.folder-tree-item:hover {
+  background: #eef2ff;
+}
+
+.folder-tree-empty {
+  font-size: 13px;
+  color: #6b7280;
+  padding: 4px 2px;
+}
+
+.folder-tree-error {
+  font-size: 13px;
+  color: #b91c1c;
+  padding: 4px 2px;
+}
+
+@media (max-width: 768px) {
+  #root {
+    margin: 8px auto;
+    max-width: 100%;
+  }
+
+  .options-card {
+    padding: 12px 12px;
+  }
+
+  .folder-tree-body {
+    min-height: 220px;
+  }
 }
