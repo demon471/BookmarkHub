@@ -19,6 +19,7 @@ const Popup: React.FC = () => {
     const [treeError, setTreeError] = useState('');
     const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
     const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
+    const [allFolderIds, setAllFolderIds] = useState<string[]>([]);
 
     const buildFolderMeta = (nodes: any[] | null) => {
         const counts: { [id: string]: number } = {};
@@ -67,7 +68,53 @@ const Popup: React.FC = () => {
             }
             const { counts, ids } = buildFolderMeta(tree);
             setFolderBookmarkCount(counts);
-            setSelectedFolderIds(ids);
+            setAllFolderIds(ids);
+
+            let initialSelectedIds: string[] | null = null;
+            let excludedFolderIds: string[] | null = null;
+            try {
+                const stored = await browser.storage.local.get(['selectedFolderIds', 'excludedFolderIds']);
+                if (Array.isArray(stored.selectedFolderIds)) {
+                    initialSelectedIds = stored.selectedFolderIds as string[];
+                }
+                if (Array.isArray(stored.excludedFolderIds)) {
+                    excludedFolderIds = stored.excludedFolderIds as string[];
+                }
+            } catch (e) {
+                console.error('Load folder selection error:', e);
+            }
+
+            let finalSelectedIds: string[];
+
+            // 优先使用排除列表：先视为全部选中，再去掉之前排除的目录
+            if (excludedFolderIds && excludedFolderIds.length) {
+                const validExcluded = excludedFolderIds.filter(id => ids.includes(id));
+                if (validExcluded.length) {
+                    finalSelectedIds = ids.filter(id => !validExcluded.includes(id));
+                } else {
+                    finalSelectedIds = ids;
+                }
+            }
+            else if (initialSelectedIds && initialSelectedIds.length) {
+                const validSelected = initialSelectedIds.filter(id => ids.includes(id));
+                finalSelectedIds = validSelected.length ? validSelected : ids;
+            }
+            else {
+                finalSelectedIds = ids;
+            }
+
+            setSelectedFolderIds(finalSelectedIds);
+
+            try {
+                const excludedToSave = ids.filter(id => !finalSelectedIds.includes(id));
+                await browser.storage.local.set({
+                    selectedFolderIds: finalSelectedIds,
+                    excludedFolderIds: excludedToSave,
+                });
+            } catch (e) {
+                console.error('Save folder selection error:', e);
+            }
+
             setFolderTree(tree);
 
         } catch (error) {
@@ -241,9 +288,13 @@ const Popup: React.FC = () => {
                 selectedFolderIds,
             });
 
-            // 只有上传成功时才持久化当前选择的文件夹，用于后续自动同步
+            // 只有上传成功时才持久化当前选择的文件夹
             if (result) {
-                await browser.storage.local.set({ selectedFolderIds });
+                const excludedFolderIds = allFolderIds.filter(id => !selectedFolderIds.includes(id));
+                await browser.storage.local.set({
+                    selectedFolderIds,
+                    excludedFolderIds,
+                });
             }
         } catch (error) {
             console.error('Confirm upload error:', error);

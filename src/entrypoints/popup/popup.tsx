@@ -4,12 +4,12 @@ import { Dropdown, Badge } from 'react-bootstrap';
 import { IconContext } from 'react-icons'
 import {
     AiOutlineCloudUpload, AiOutlineCloudDownload,
-    AiOutlineCloudSync, AiOutlineSetting, AiOutlineClear
+    AiOutlineSetting, AiOutlineClear
 } from 'react-icons/ai'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './popup.css'
 const Popup: React.FC = () => {
-    const [count, setCount] = useState({ local: "0", remote: "0" })
+    const [count, setCount] = useState({ local: "0", remote: "0", excluded: "0" })
     useEffect(() => {
         document.addEventListener('click', (e: MouseEvent) => {
             let elem = e.target as HTMLInputElement;
@@ -27,11 +27,30 @@ const Popup: React.FC = () => {
         });
     }, [])
     useEffect(() => {
-        let getSetting = async () => {
-            let data = await browser.storage.local.get(["localCount", "remoteCount"]);
-            setCount({ local: data["localCount"], remote: data["remoteCount"] });
-        }
+        const getSetting = async () => {
+            const data = await browser.storage.local.get(["localCount", "remoteCount"]);
+            const localNum = Number(data["localCount"] ?? 0);
+            const remoteNum = Number(data["remoteCount"] ?? 0);
+            const excludedNum = Math.max(localNum - remoteNum, 0);
+            setCount({
+                local: String(localNum),
+                remote: String(remoteNum),
+                excluded: String(excludedNum),
+            });
+        };
+
         getSetting();
+
+        const handleChange = (changes: any, areaName: string) => {
+            if (areaName === 'local' && (changes.localCount || changes.remoteCount)) {
+                getSetting();
+            }
+        };
+
+        browser.storage.onChanged.addListener(handleChange);
+        return () => {
+            browser.storage.onChanged.removeListener(handleChange);
+        };
     }, [])
     return (
         <IconContext.Provider value={{ className: 'dropdown-item-icon' }}>
@@ -59,8 +78,8 @@ const Popup: React.FC = () => {
                             <Badge id="remoteCount" variant="light" title={browser.i18n.getMessage('remoteCount')}>{count["remote"]}</Badge>
                             <span style={{ fontSize: '12px', color: '#666' }}>远程</span>
                         </div>
-                        <Badge variant="success" title="自动同步已启用 - 每2秒检查一次">
-                            <AiOutlineCloudSync /> 自动同步
+                        <Badge variant="secondary" title="被过滤掉、不参与同步的本地书签数量">
+                            排除 {count["excluded"]}
                         </Badge>
                     </div>
                 </Dropdown.ItemText>
