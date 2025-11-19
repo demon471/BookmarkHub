@@ -192,7 +192,9 @@ const Popup: React.FC = () => {
                     githubToken: config.githubToken || '',
                     gistID: config.gistID || '',
                     gistFileName: config.gistFileName || 'BookmarkHub',
-                    enableNotify: config.enableNotify !== false
+                    enableNotify: config.enableNotify !== false,
+                    autoSyncEnabled: config.autoSyncEnabled || false,
+                    autoSyncInterval: config.autoSyncInterval || 15
                 }
             };
 
@@ -232,7 +234,9 @@ const Popup: React.FC = () => {
                 githubToken: importData.config.githubToken || '',
                 gistID: importData.config.gistID || '',
                 gistFileName: importData.config.gistFileName || 'BookmarkHub',
-                enableNotify: importData.config.enableNotify !== false
+                enableNotify: importData.config.enableNotify !== false,
+                autoSyncEnabled: importData.config.autoSyncEnabled || false,
+                autoSyncInterval: importData.config.autoSyncInterval || 15
             };
 
             // 保存导入的配置

@@ -36,6 +36,9 @@ export default defineBackground(() => {
   let configChangeTimer: ReturnType<typeof setTimeout> | null = null;
   let badgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let isClearing = false; // 标记是否正在清空书签，防止触发同步
+  let autoDownloadTimer: ReturnType<typeof setInterval> | null = null;
+  const AUTO_DOWNLOAD_CHECK_INTERVAL_MS = 60 * 1000;
+
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
       curOperType = OperType.SYNC
@@ -203,7 +206,7 @@ export default defineBackground(() => {
     }
   })
 
-  // Listen for configuration changes to trigger initial sync
+  // Listen for configuration changes to trigger initial sync 和自动同步定时器更新
   browser.storage.onChanged.addListener(async (changes, areaName) => {
     if (areaName === 'sync' && (changes.githubToken || changes.gistID)) {
       console.log('📝 GitHub configuration changed, checking...');
@@ -230,6 +233,14 @@ export default defineBackground(() => {
         }
         configChangeTimer = null;
       }, 1000);
+    }
+
+    if (areaName === 'sync' && (changes.autoSyncEnabled || changes.autoSyncInterval)) {
+      console.log('📝 Auto-sync configuration changed:', {
+        autoSyncEnabled: changes.autoSyncEnabled?.newValue,
+        autoSyncInterval: changes.autoSyncInterval?.newValue,
+      });
+      initializeAutoDownloadFromSettings();
     }
   });
 
@@ -1060,6 +1071,7 @@ export default defineBackground(() => {
   async function triggerAutoDownloadIfEnabled(): Promise<void> {
     try {
       console.log('🔍 Checking auto-download conditions...');
+      
       const setting = await Setting.build();
       console.log('⚙️ Auto-download settings:', {
         enabled: setting.autoSyncEnabled,
@@ -1118,6 +1130,42 @@ export default defineBackground(() => {
     }
   }
 
+  function startAutoDownloadTimer() {
+    if (autoDownloadTimer) {
+      clearInterval(autoDownloadTimer);
+      autoDownloadTimer = null;
+    }
+    autoDownloadTimer = setInterval(() => {
+      triggerAutoDownloadIfEnabled().catch(error => {
+        console.error('❌ Auto download timer tick error:', error);
+      });
+    }, AUTO_DOWNLOAD_CHECK_INTERVAL_MS);
+    console.log('⏰ Auto-download timer started. Check interval (seconds):', AUTO_DOWNLOAD_CHECK_INTERVAL_MS / 1000);
+  }
+
+  function stopAutoDownloadTimer() {
+    if (autoDownloadTimer) {
+      clearInterval(autoDownloadTimer);
+      autoDownloadTimer = null;
+      console.log('⏹️ Auto-download timer stopped');
+    }
+  }
+
+  async function initializeAutoDownloadFromSettings(): Promise<void> {
+    try {
+      const setting = await Setting.build();
+      if (setting.autoSyncEnabled) {
+        console.log('⚙️ Auto-download enabled in settings. Interval (minutes):', setting.autoSyncInterval);
+        startAutoDownloadTimer();
+      } else {
+        console.log('⚙️ Auto-download disabled in settings, timer will not run');
+        stopAutoDownloadTimer();
+      }
+    } catch (error) {
+      console.error('❌ Failed to initialize auto-download from settings:', error);
+    }
+  }
+
   ///暂时不启用自动备份
   /*
   async function backupToLocalStorage(bookmarks: BookmarkInfo[]) {
@@ -1134,5 +1182,8 @@ export default defineBackground(() => {
     }
   }
   */
+
+  // Initialize auto-download timer when background starts
+  initializeAutoDownloadFromSettings();
 
 });
