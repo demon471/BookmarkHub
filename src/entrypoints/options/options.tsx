@@ -56,6 +56,8 @@ const Popup: React.FC = () => {
         setValue('gistID', options.gistID || '');
         setValue('gistFileName', options.gistFileName || 'BookmarkHub');
         setValue('enableNotify', options.enableNotify !== false);
+        setValue('autoSyncEnabled', options.autoSyncEnabled || false);
+        setValue('autoSyncInterval', options.autoSyncInterval || 15);
     };
 
     const loadFolderTree = async () => {
@@ -134,7 +136,9 @@ const Popup: React.FC = () => {
                 githubToken: data.githubToken || '',
                 gistID: data.gistID || '',
                 gistFileName: data.gistFileName || 'BookmarkHub',
-                enableNotify: data.enableNotify !== false
+                enableNotify: data.enableNotify !== false,
+                autoSyncEnabled: data.autoSyncEnabled || false,
+                autoSyncInterval: parseInt(data.autoSyncInterval) || 15
             });
 
             console.log('✅ Configuration saved:', {
@@ -444,6 +448,42 @@ const Popup: React.FC = () => {
                                         type="switch"
                                         defaultChecked={true}
                                     />
+                                </Col>
+                            </Form.Group>
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncEnabled')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <Form.Check
+                                        id="autoSyncEnabled"
+                                        name="autoSyncEnabled"
+                                        ref={register}
+                                        type="switch"
+                                        defaultChecked={false}
+                                    />
+                                    <Form.Text className="text-muted">
+                                        定期从远程拉取书签并合并到本地（不会删除本地书签）
+                                    </Form.Text>
+                                </Col>
+                            </Form.Group>
+
+                            <Form.Group as={Row}>
+                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncInterval')}</Form.Label>
+                                <Col sm={9} lg={10} xs={9}>
+                                    <Form.Control
+                                        as="select"
+                                        name="autoSyncInterval"
+                                        ref={register}
+                                        size="sm"
+                                        defaultValue="15"
+                                    >
+                                        <option value="5">{browser.i18n.getMessage('autoSyncInterval5')}</option>
+                                        <option value="15">{browser.i18n.getMessage('autoSyncInterval15')}</option>
+                                        <option value="30">{browser.i18n.getMessage('autoSyncInterval30')}</option>
+                                        <option value="60">{browser.i18n.getMessage('autoSyncInterval60')}</option>
+                                    </Form.Control>
+                                    <Form.Text className="text-muted">
+                                        自动同步的时间间隔
+                                    </Form.Text>
                                 </Col>
                             </Form.Group>
 

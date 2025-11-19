@@ -145,55 +145,59 @@ export default defineBackground(() => {
     return true;
   });
   browser.bookmarks.onCreated.addListener(async (id, info) => {
+    console.log('📌 Bookmark created:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
-      // console.log("onCreated", id, info)
+      console.log('✅ Triggering badge and auto-sync check for created bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
       refreshLocalCount();
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
-      // Trigger auto sync if enabled
-      await triggerAutoSyncIfEnabled();
+      // Trigger auto upload
+      await triggerAutoUpload();
     } else if (isClearing) {
       console.log('⏸️ Bookmark created during clear operation, skipping sync');
     }
   });
   browser.bookmarks.onChanged.addListener(async (id, info) => {
+    console.log('📝 Bookmark changed:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
-      // console.log("onChanged", id, info)
+      console.log('✅ Triggering badge and auto-sync check for changed bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
-      // Trigger auto sync if enabled
-      await triggerAutoSyncIfEnabled();
+      // Trigger auto upload
+      await triggerAutoUpload();
     } else if (isClearing) {
       console.log('⏸️ Bookmark changed during clear operation, skipping sync');
     }
   })
   browser.bookmarks.onMoved.addListener(async (id, info) => {
+    console.log('📦 Bookmark moved:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
-      // console.log("onMoved", id, info)
+      console.log('✅ Triggering badge and auto-sync check for moved bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
-      // Trigger auto sync if enabled
-      await triggerAutoSyncIfEnabled();
+      // Trigger auto upload
+      await triggerAutoUpload();
     } else if (isClearing) {
       console.log('⏸️ Bookmark moved during clear operation, skipping sync');
     }
   })
   browser.bookmarks.onRemoved.addListener(async (id, info) => {
+    console.log("Bookmark removed:", id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
-      console.log("Bookmark removed:", id, info);
+      console.log('✅ Triggering badge and auto-sync check for removed bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
       refreshLocalCount();
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
-      // Trigger auto sync if enabled
-      await triggerAutoSyncIfEnabled();
+      // Trigger auto upload
+      await triggerAutoUpload();
     } else if (isClearing) {
       console.log('⏸️ Bookmark removed during clear operation, skipping sync');
     }
@@ -334,27 +338,34 @@ export default defineBackground(() => {
 
   async function uploadBookmarks(selectedFolderIds?: string[]) {
     try {
-      console.log('Starting upload bookmarks...');
+      console.log('📤 Starting upload bookmarks...');
       await showSyncBadge('syncing');
 
       let setting = await Setting.build()
-      console.log('Setting loaded:', {
+      console.log('📋 Settings loaded:', {
         hasToken: !!setting.githubToken,
+        tokenLength: setting.githubToken?.length || 0,
         hasGistID: !!setting.gistID,
-        hasFileName: !!setting.gistFileName,
         gistID: setting.gistID,
-        fileName: setting.gistFileName
+        hasFileName: !!setting.gistFileName,
+        fileName: setting.gistFileName,
+        githubURL: setting.githubURL
       });
 
       if (setting.githubToken == '') {
+        console.error('❌ Configuration error: Gist Token Not Found');
         throw new Error("Gist Token Not Found");
       }
       if (setting.gistID == '') {
+        console.error('❌ Configuration error: Gist ID Not Found');
         throw new Error("Gist ID Not Found");
       }
       if (setting.gistFileName == '') {
+        console.error('❌ Configuration error: Gist File Not Found');
         throw new Error("Gist File Not Found");
       }
+      
+      console.log('✅ Configuration validated');
 
       let bookmarks = await getBookmarks();
       console.log('Bookmarks loaded:', bookmarks.length, 'items');
@@ -395,9 +406,12 @@ export default defineBackground(() => {
         description: setting.gistFileName
       };
       
-      console.log('Sending update request to GitHub API...');
+      console.log('🌐 Sending update request to GitHub API...');
+      console.log('   - Target Gist:', setting.gistID);
+      console.log('   - File:', setting.gistFileName);
+      console.log('   - Data size:', JSON.stringify(updateData).length, 'bytes');
       const result = await BookmarkService.update(updateData);
-      console.log('Update result:', result);
+      console.log('✅ GitHub API response received:', result ? 'Success' : 'No response');
       
       const count = getBookmarkCount(syncdata.bookmarks);
       await browser.storage.local.set({ remoteCount: count });
@@ -427,7 +441,10 @@ export default defineBackground(() => {
 
     }
     catch (error: any) {
-      console.error('Upload bookmarks error:', error);
+      console.error('❌ Upload bookmarks error:', error);
+      console.error('   Error type:', error.constructor.name);
+      console.error('   Error message:', error.message);
+      console.error('   Error stack:', error.stack);
       await showSyncBadge('error');
       
       // 只在配置问题时显示一次提示
@@ -1007,49 +1024,114 @@ export default defineBackground(() => {
     }
   }
 
-  async function triggerAutoSyncIfEnabled(): Promise<void> {
+  async function triggerAutoUpload(): Promise<void> {
     try {
+      console.log('🔍 Checking auto-upload conditions...');
       const setting = await Setting.build();
-      if (!setting.autoSyncEnabled) {
+      
+      // GitHub configuration check
+      if (!setting.githubToken || !setting.gistID || !setting.gistFileName) {
+        console.log('⚠️ Auto upload skipped: GitHub not fully configured');
+        console.log('   - Token:', setting.githubToken ? '✓' : '✗');
+        console.log('   - Gist ID:', setting.gistID ? '✓' : '✗');
+        console.log('   - File Name:', setting.gistFileName ? '✓' : '✗');
         return;
       }
+      
+      if (curOperType !== OperType.NONE) {
+        console.log('⏸️ Auto upload skipped: another operation in progress');
+        return;
+      }
+      
+      console.log('🚀 Auto upload triggered! Starting upload...');
+      curOperType = OperType.SYNC;
+      try {
+        await uploadBookmarks();
+        console.log('✅ Auto upload completed successfully');
+      } finally {
+        curOperType = OperType.NONE;
+      }
+    } catch (error) {
+      console.error('❌ Error triggering auto upload:', error);
+      curOperType = OperType.NONE;
+    }
+  }
+
+  async function triggerAutoDownloadIfEnabled(): Promise<void> {
+    try {
+      console.log('🔍 Checking auto-download conditions...');
+      const setting = await Setting.build();
+      console.log('⚙️ Auto-download settings:', {
+        enabled: setting.autoSyncEnabled,
+        interval: setting.autoSyncInterval,
+        hasToken: !!setting.githubToken,
+        hasGistID: !!setting.gistID,
+        hasFileName: !!setting.gistFileName
+      });
+      
+      if (!setting.autoSyncEnabled) {
+        console.log('⏸️ Auto download disabled, skipping');
+        return;
+      }
+      
+      // GitHub configuration check
+      if (!setting.githubToken || !setting.gistID || !setting.gistFileName) {
+        console.log('⚠️ Auto download skipped: GitHub not fully configured');
+        return;
+      }
+      
       const data = await browser.storage.local.get(['lastSyncTime']);
       const lastSyncTime = data.lastSyncTime || 0;
       const intervalMinutes = setting.autoSyncInterval || 15;
       const intervalMs = intervalMinutes * 60 * 1000;
       const now = Date.now();
+      const timeSinceLastSync = now - lastSyncTime;
+      
+      console.log('⏱️ Download timing check:', {
+        lastSync: lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never',
+        intervalMinutes,
+        timeSinceLastSync: Math.floor(timeSinceLastSync / 1000) + 's',
+        needsSync: !lastSyncTime || timeSinceLastSync >= intervalMs
+      });
+
       if (lastSyncTime && now - lastSyncTime < intervalMs) {
+        console.log('⏸️ Auto download skipped: interval not reached');
         return;
       }
+      
       if (curOperType !== OperType.NONE) {
+        console.log('⏸️ Auto download skipped: another operation in progress');
         return;
       }
+      
+      console.log('🚀 Auto download triggered! Starting merge download...');
       curOperType = OperType.SYNC;
       try {
-        await uploadBookmarks();
+        await downloadBookmarks({ mergeLocal: true });
+        console.log('✅ Auto download completed successfully');
       } finally {
         curOperType = OperType.NONE;
       }
     } catch (error) {
-      console.error('Error triggering auto sync:', error);
+      console.error('❌ Error triggering auto download:', error);
+      curOperType = OperType.NONE;
     }
   }
 
   ///暂时不启用自动备份
   /*
   async function backupToLocalStorage(bookmarks: BookmarkInfo[]) {
-      try {
-          let syncdata = new SyncDataInfo();
-          syncdata.version = browser.runtime.getManifest().version;
-          syncdata.createDate = Date.now();
-          syncdata.bookmarks = formatBookmarks(bookmarks);
-          syncdata.browser = navigator.userAgent;
-          const keyname = 'BookmarkHub_backup_' + Date.now().toString();
-          await browser.storage.local.set({ [keyname]: JSON.stringify(syncdata) });
-      }
-      catch (error:any) {
-          console.error(error)
-      }
+    try {
+      let syncdata = new SyncDataInfo();
+      syncdata.version = browser.runtime.getManifest().version;
+      syncdata.createDate = Date.now();
+      syncdata.bookmarks = formatBookmarks(bookmarks);
+      syncdata.browser = navigator.userAgent;
+      const keyname = 'BookmarkHub_backup_' + Date.now().toString();
+      await browser.storage.local.set({ [keyname]: JSON.stringify(syncdata) });
+    } catch (error: any) {
+      console.error(error)
+    }
   }
   */
 
