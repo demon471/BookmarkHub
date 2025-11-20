@@ -234,7 +234,91 @@ html, body {
 .options-action-buttons {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+}
+
+.options-action-button {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 25px rgba(15, 23, 42, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  min-width: 0;
+}
+
+.options-action-button:focus,
+.options-action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 30px rgba(15, 23, 42, 0.2);
+}
+
+.options-action-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.options-action-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.options-action-copy {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.3;
+}
+
+.options-action-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.options-action-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.options-action-button--save {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+}
+
+.options-action-button--save .options-action-subtitle {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.options-action-button--export {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+}
+
+.options-action-button--export .options-action-subtitle {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.options-action-button--import {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: #fff;
+}
+
+.options-action-button--import .options-action-subtitle {
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .options-import-label {

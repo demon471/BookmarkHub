@@ -551,27 +551,62 @@ const Popup: React.FC = () => {
 
                                 <div className="options-form-actions">
                                     <div className="options-action-buttons">
-                                        <Button type="submit" variant="primary" disabled={saving} size="sm">
-                                            {saving ? '保存中…' : '💾 保存配置'}
+                                        <Button
+                                            type="submit"
+                                            disabled={saving}
+                                            className="options-action-button options-action-button--save"
+                                        >
+                                            <span className="options-action-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                    <path d="M12 5v8" />
+                                                    <path d="M9 10l3 3 3-3" />
+                                                    <path d="M6 13v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4" />
+                                                    <path d="M15 5h1a2 2 0 0 1 2 2v2" />
+                                                </svg>
+                                            </span>
+                                            <span className="options-action-copy">
+                                                <span className="options-action-title">{saving ? '保存中…' : '保存配置'}</span>
+                                                <span className="options-action-subtitle">即时应用当前设置</span>
+                                            </span>
                                         </Button>
                                         <Button
                                             type="button"
-                                            variant="success"
-                                            size="sm"
+                                            className="options-action-button options-action-button--export"
                                             onClick={handleExportConfig}
                                         >
-                                            📤 导出配置
+                                            <span className="options-action-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                    <path d="M12 19V7" />
+                                                    <path d="M9 10l3-3 3 3" />
+                                                    <path d="M5 19h14" />
+                                                </svg>
+                                            </span>
+                                            <span className="options-action-copy">
+                                                <span className="options-action-title">导出配置</span>
+                                                <span className="options-action-subtitle">备份为 JSON 文件</span>
+                                            </span>
                                         </Button>
+
                                         <label htmlFor="importConfigFile" className="options-import-label">
                                             <Button
                                                 type="button"
-                                                variant="info"
-                                                size="sm"
                                                 as="span"
+                                                className="options-action-button options-action-button--import"
                                             >
-                                                📥 导入配置
+                                                <span className="options-action-icon" aria-hidden="true">
+                                                    <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                        <path d="M12 5v12" />
+                                                        <path d="M9 14l3 3 3-3" />
+                                                        <path d="M5 5h14" />
+                                                    </svg>
+                                                </span>
+                                                <span className="options-action-copy">
+                                                    <span className="options-action-title">导入配置</span>
+                                                    <span className="options-action-subtitle">从 JSON 恢复设置</span>
+                                                </span>
                                             </Button>
                                         </label>
+
                                         <input
                                             id="importConfigFile"
                                             type="file"
@@ -580,6 +615,7 @@ const Popup: React.FC = () => {
                                             style={{ display: 'none' }}
                                         />
                                     </div>
+
                                     <div className="options-feedback">
                                         {saveMessage && <span className={saveMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{saveMessage}</span>}
                                         {importMessage && <span className={importMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{importMessage}</span>}
