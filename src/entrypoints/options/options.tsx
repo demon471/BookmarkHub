@@ -358,6 +358,12 @@ const Popup: React.FC = () => {
     };
 
     const handleToggleFolder = (id: string) => {
+        if (folderTree && folderTree.length > 0) {
+            const rootNode = folderTree[0];
+            if (rootNode && rootNode.id === id) {
+                return;
+            }
+        }
         const idsToToggle = getDescendantFolderIds(folderTree, id);
         setSelectedFolderIds(prev => {
             const allSelected = idsToToggle.every(folderId => prev.includes(folderId));
@@ -377,10 +383,11 @@ const Popup: React.FC = () => {
         }
         return (
             <ul className="folder-tree-list">
-                {nodes.map(node => {
+                {nodes.map((node, index) => {
                     if (node.url) {
                         return null;
                     }
+                    const isRoot = !node.parentId && index === 0;
                     const hasChildFolder = node.children && node.children.some(child => !child.url);
                     return (
                         <li key={node.id}>
@@ -390,7 +397,8 @@ const Popup: React.FC = () => {
                                         type="checkbox"
                                         className="folder-checkbox"
                                         checked={selectedFolderIds.includes(node.id)}
-                                        onChange={() => handleToggleFolder(node.id)}
+                                        disabled={isRoot}
+                                        onChange={isRoot ? undefined : () => handleToggleFolder(node.id)}
                                     />
                                     <span className="folder-icon" />
                                     <span className="folder-title">{node.title || '(未命名文件夹)'}</span>
