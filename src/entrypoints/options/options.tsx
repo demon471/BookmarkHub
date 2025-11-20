@@ -449,9 +449,10 @@ const Popup: React.FC = () => {
                         <strong>{folderSelectionStats.coverage}%</strong>
                     </div>
                 </div>
-            </div>
-            <Row className="options-layout">
-                <Col xs={12} md={5} lg={5} className="options-col">
+                </div>
+                <Row className="options-layout">
+                <Col xs={12} md={6} lg={6} className="options-col">
+
                     <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)} className="options-form">
                         <div className="options-card">
                             <div className="options-card-header">
@@ -588,7 +589,8 @@ const Popup: React.FC = () => {
                         </div>
                     </Form>
                 </Col>
-                <Col xs={12} md={7} lg={7} className="options-col">
+                <Col xs={12} md={6} lg={6} className="options-col">
+
                     <div className="options-card folder-tree-card">
                         <div className="options-card-header">
                             <div>
@@ -636,6 +638,7 @@ const Popup: React.FC = () => {
                         </div>
                     </div>
                 </Col>
+
             </Row>
         </Container >
     )
