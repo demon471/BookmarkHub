@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import ReactDOM from 'react-dom/client';
 import { Container, Form, Button, Col, Row, InputGroup, Modal } from 'react-bootstrap';
+
 // @ts-ignore
 import { useForm } from "react-hook-form";
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -20,6 +21,14 @@ const Popup: React.FC = () => {
     const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
     const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
     const [allFolderIds, setAllFolderIds] = useState<string[]>([]);
+
+    const folderSelectionStats = useMemo(() => {
+        const total = allFolderIds.length;
+        const selected = selectedFolderIds.length;
+        const excluded = Math.max(total - selected, 0);
+        const coverage = total > 0 ? Math.round((selected / total) * 100) : 0;
+        return { total, selected, excluded, coverage };
+    }, [selectedFolderIds, allFolderIds]);
 
     const buildFolderMeta = (nodes: any[] | null) => {
         const counts: { [id: string]: number } = {};
@@ -420,91 +429,129 @@ const Popup: React.FC = () => {
 
     return (
         <Container className="options-root">
+            <div className="options-page-header">
+                <div className="options-heading">
+                    <p className="options-eyebrow">BookmarkHub</p>
+                    <h1>同步设置中心</h1>
+                    <p>统一的卡片式布局，快速完成 GitHub 配置与同步范围选择。</p>
+                </div>
+                <div className="options-page-meta">
+                    <div className="options-meta-item">
+                        <span>已选文件夹</span>
+                        <strong>{folderSelectionStats.selected}</strong>
+                    </div>
+                    <div className="options-meta-item">
+                        <span>已排除</span>
+                        <strong>{folderSelectionStats.excluded}</strong>
+                    </div>
+                    <div className="options-meta-item">
+                        <span>覆盖率</span>
+                        <strong>{folderSelectionStats.coverage}%</strong>
+                    </div>
+                </div>
+            </div>
             <Row className="options-layout">
                 <Col xs={12} md={5} lg={5} className="options-col">
-                    <div className="options-card">
-                        <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)}>
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('githubToken')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <InputGroup size="sm">
-                                        <Form.Control name="githubToken" ref={register} type="text" placeholder="github token" size="sm" />
-                                        <InputGroup.Append>
-                                            <Button variant="outline-secondary" as="a" target="_blank" href="https://github.com/settings/tokens/new" size="sm">Get Token</Button>
-                                        </InputGroup.Append>
-                                    </InputGroup>
-                                </Col>
-                            </Form.Group>
+                    <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)} className="options-form">
+                        <div className="options-card">
+                            <div className="options-card-header">
+                                <div>
+                                    <p className="options-card-eyebrow">GitHub</p>
+                                    <h2 className="options-card-title">云同步凭据</h2>
+                                    <p className="options-card-desc">填写 GitHub Token 与 Gist 信息，BookmarkHub 将自动安全地同步您的书签。</p>
+                                </div>
+                            </div>
+                            <div className="options-card-body">
+                                <div className="options-section">
+                                    <div className="options-section-title">访问凭据</div>
+                                    <div className="options-section-body">
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('githubToken')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <InputGroup size="sm">
+                                                    <Form.Control name="githubToken" ref={register} type="text" placeholder="GitHub Token" size="sm" />
+                                                    <InputGroup.Append>
+                                                        <Button variant="outline-secondary" as="a" target="_blank" href="https://github.com/settings/tokens/new" size="sm">获取 Token</Button>
+                                                    </InputGroup.Append>
+                                                </InputGroup>
+                                            </Col>
+                                        </Form.Group>
 
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistID')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <Form.Control name="gistID" ref={register} type="text" placeholder="gist ID" size="sm" />
-                                </Col>
-                            </Form.Group>
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistID')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Control name="gistID" ref={register} type="text" placeholder="Gist ID" size="sm" />
+                                            </Col>
+                                        </Form.Group>
 
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistFileName')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <Form.Control name="gistFileName" ref={register} type="text" placeholder="gist file name" size="sm" defaultValue="BookmarkHub" />
-                                </Col>
-                            </Form.Group>
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('gistFileName')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Control name="gistFileName" ref={register} type="text" placeholder="Gist 文件名" size="sm" defaultValue="BookmarkHub" />
+                                            </Col>
+                                        </Form.Group>
+                                    </div>
+                                </div>
 
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('enableNotifications')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <Form.Check
-                                        id="enableNotify"
-                                        name="enableNotify"
-                                        ref={register}
-                                        type="switch"
-                                        defaultChecked={true}
-                                    />
-                                </Col>
-                            </Form.Group>
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncEnabled')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <Form.Check
-                                        id="autoSyncEnabled"
-                                        name="autoSyncEnabled"
-                                        ref={register}
-                                        type="switch"
-                                        defaultChecked={false}
-                                    />
-                                    <Form.Text className="text-muted">
-                                        定期从远程拉取书签并合并到本地（不会删除本地书签）
-                                    </Form.Text>
-                                </Col>
-                            </Form.Group>
+                                <div className="options-section">
+                                    <div className="options-section-title">同步偏好</div>
+                                    <div className="options-section-body">
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('enableNotifications')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Check
+                                                    id="enableNotify"
+                                                    name="enableNotify"
+                                                    ref={register}
+                                                    type="switch"
+                                                    defaultChecked={true}
+                                                />
+                                            </Col>
+                                        </Form.Group>
 
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncInterval')}</Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <Form.Control
-                                        as="select"
-                                        name="autoSyncInterval"
-                                        ref={register}
-                                        size="sm"
-                                        defaultValue="15"
-                                    >
-                                        <option value="5">{browser.i18n.getMessage('autoSyncInterval5')}</option>
-                                        <option value="15">{browser.i18n.getMessage('autoSyncInterval15')}</option>
-                                        <option value="30">{browser.i18n.getMessage('autoSyncInterval30')}</option>
-                                        <option value="60">{browser.i18n.getMessage('autoSyncInterval60')}</option>
-                                    </Form.Control>
-                                    <Form.Text className="text-muted">
-                                        自动同步的时间间隔
-                                    </Form.Text>
-                                </Col>
-                            </Form.Group>
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncEnabled')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Check
+                                                    id="autoSyncEnabled"
+                                                    name="autoSyncEnabled"
+                                                    ref={register}
+                                                    type="switch"
+                                                    defaultChecked={false}
+                                                />
+                                                <Form.Text className="text-muted">
+                                                    定期从远程拉取书签并合并到本地（不会删除本地书签）
+                                                </Form.Text>
+                                            </Col>
+                                        </Form.Group>
 
-                            <Form.Group as={Row}>
-                                <Form.Label column="sm" sm={3} lg={2} xs={3}></Form.Label>
-                                <Col sm={9} lg={10} xs={9}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncInterval')}</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Control
+                                                    as="select"
+                                                    name="autoSyncInterval"
+                                                    ref={register}
+                                                    size="sm"
+                                                    defaultValue="15"
+                                                >
+                                                    <option value="5">{browser.i18n.getMessage('autoSyncInterval5')}</option>
+                                                    <option value="15">{browser.i18n.getMessage('autoSyncInterval15')}</option>
+                                                    <option value="30">{browser.i18n.getMessage('autoSyncInterval30')}</option>
+                                                    <option value="60">{browser.i18n.getMessage('autoSyncInterval60')}</option>
+                                                </Form.Control>
+                                                <Form.Text className="text-muted">
+                                                    自动同步的时间间隔
+                                                </Form.Text>
+                                            </Col>
+                                        </Form.Group>
+                                    </div>
+                                </div>
+
+                                <div className="options-form-actions">
+                                    <div className="options-action-buttons">
                                         <Button type="submit" variant="primary" disabled={saving} size="sm">
-                                            {saving ? '保存中...' : '💾 保存配置'}
+                                            {saving ? '保存中…' : '💾 保存配置'}
                                         </Button>
                                         <Button
                                             type="button"
@@ -514,13 +561,12 @@ const Popup: React.FC = () => {
                                         >
                                             📤 导出配置
                                         </Button>
-                                        <label htmlFor="importConfigFile" style={{ margin: 0 }}>
+                                        <label htmlFor="importConfigFile" className="options-import-label">
                                             <Button
                                                 type="button"
                                                 variant="info"
                                                 size="sm"
                                                 as="span"
-                                                style={{ cursor: 'pointer' }}
                                             >
                                                 📥 导入配置
                                             </Button>
@@ -533,46 +579,76 @@ const Popup: React.FC = () => {
                                             style={{ display: 'none' }}
                                         />
                                     </div>
-                                    <div style={{ marginTop: '8px' }}>
-                                        {saveMessage && <span style={{ color: saveMessage.startsWith('✅') ? 'green' : 'red', marginRight: '10px' }}>{saveMessage}</span>}
-                                        {importMessage && <span style={{ color: importMessage.startsWith('✅') ? 'green' : 'red' }}>{importMessage}</span>}
+                                    <div className="options-feedback">
+                                        {saveMessage && <span className={saveMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{saveMessage}</span>}
+                                        {importMessage && <span className={importMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{importMessage}</span>}
                                     </div>
-                                </Col>
-                            </Form.Group>
-                        </Form>
-                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Form>
                 </Col>
                 <Col xs={12} md={7} lg={7} className="options-col">
                     <div className="options-card folder-tree-card">
-                        <div className="folder-tree-header">
-                            <span className="folder-tree-title">书签文件夹预览</span>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <Button
-                                    variant="outline-secondary"
-                                    size="sm"
-                                    onClick={loadFolderTree}
-                                    disabled={loadingTree}
-                                >
-                                    {loadingTree ? '刷新中...' : '刷新'}
-                                </Button>
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    onClick={handleConfirmUpload}
-                                    disabled={syncing || !folderTree}
-                                >
-                                    {syncing ? '上传中...' : '确定'}
-                                </Button>
+                        <div className="options-card-header">
+                            <div>
+                                <p className="options-card-eyebrow">书签</p>
+                                <h2 className="options-card-title">同步范围预览</h2>
+                                <p className="options-card-desc">只需勾选即可定义同步范围，BookmarkHub 会记住您的选择。</p>
+                            </div>
+                            <div className="folder-tree-meta">
+                                <div className="folder-tree-meta-item">
+                                    <span>总数</span>
+                                    <strong>{folderSelectionStats.total}</strong>
+                                </div>
+                                <div className="folder-tree-meta-item">
+                                    <span>已选</span>
+                                    <strong>{folderSelectionStats.selected}</strong>
+                                </div>
+                                <div className="folder-tree-meta-item">
+                                    <span>覆盖率</span>
+                                    <strong>{folderSelectionStats.coverage}%</strong>
+                                </div>
                             </div>
                         </div>
-                        <div className="folder-tree-body">
-                            {treeError && <div className="folder-tree-error">{treeError}</div>}
-                            {!treeError && !folderTree && loadingTree && (
-                                <div className="folder-tree-empty">正在加载书签...</div>
-                            )}
-                            {!treeError && folderTree && !loadingTree && (
-                                renderFolderNodes(folderTree) || <div className="folder-tree-empty">没有找到任何书签文件夹。</div>
-                            )}
+                        <div className="options-card-body">
+                            <div className="folder-tree-toolbar">
+                                <div>
+                                    <p className="options-card-desc" style={{ marginBottom: 0 }}>
+                                        {loadingTree ? '正在加载书签…' : '勾选任意文件夹即可包含其全部子目录。'}
+                                    </p>
+                                </div>
+                                <div className="folder-tree-toolbar-actions">
+                                    <Button
+                                        variant="outline-secondary"
+                                        size="sm"
+                                        onClick={loadFolderTree}
+                                        disabled={loadingTree}
+                                    >
+                                        {loadingTree ? '刷新中…' : '刷新'}
+                                    </Button>
+                                    <Button
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={handleConfirmUpload}
+                                        disabled={syncing || !folderTree}
+                                    >
+                                        {syncing ? '上传中…' : '保存选择'}
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="folder-tree-body">
+                                {treeError && <div className="folder-tree-error">{treeError}</div>}
+                                {!treeError && !folderTree && loadingTree && (
+                                    <div className="folder-tree-empty">正在加载书签...</div>
+                                )}
+                                {!treeError && folderTree && !loadingTree && (
+                                    renderFolderNodes(folderTree) || <div className="folder-tree-empty">没有找到任何书签文件夹。</div>
+                                )}
+                            </div>
+                            <div className="folder-tree-footer">
+                                <p className="options-note">保存选择后，上传操作将仅同步已选文件夹，避免私密或临时书签被推送到远程。</p>
+                            </div>
                         </div>
                     </div>
                 </Col>

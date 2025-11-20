@@ -2,6 +2,9 @@ html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+  font-family: 'Segoe UI', 'PingFang SC', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f4f6fb;
+  color: #0f172a;
 }
 
 #root {
@@ -13,11 +16,62 @@ html, body {
 }
 
 .options-root {
-  padding-top: 8px;
+  padding: 32px 24px 48px;
   width: 100%;
   max-width: none;
-  padding-left: 0;
-  padding-right: 0;
+}
+
+.options-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 32px;
+  align-items: flex-start;
+  padding: 0 8px 24px;
+}
+
+.options-heading h1 {
+  margin: 4px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.options-eyebrow {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  font-weight: 600;
+}
+
+.options-heading p {
+  margin: 8px 0 0;
+  color: #475569;
+  max-width: 520px;
+}
+
+.options-page-meta {
+  display: flex;
+  gap: 16px;
+  background: white;
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.options-meta-item {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.options-meta-item strong {
+  font-size: 20px;
+  margin-top: 4px;
+  color: #0f172a;
 }
 
 .options-layout {
@@ -28,15 +82,15 @@ html, body {
 
 .options-col {
   display: flex;
-  padding-left: 0;
-  padding-right: 0;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .options-card {
   background: #ffffff;
-  border-radius: 8px;
-  padding: 16px 18px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.4);
   margin-bottom: 16px;
   display: flex;
@@ -44,10 +98,159 @@ html, body {
   flex: 1;
 }
 
+.options-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.options-card-eyebrow {
+  text-transform: uppercase;
+  color: #94a3b8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+}
+
+.options-card-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.options-card-desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.options-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.options-section {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 12px;
+  padding: 16px 18px;
+  background: #f8fafc;
+}
+
+.options-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.options-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.options-form-group {
+  margin-bottom: 0;
+  align-items: center;
+}
+
+.options-form-group label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.options-form .form-control,
+.options-form .form-select,
+.options-form .form-check-input {
+  border-radius: 10px;
+  border-color: rgba(203, 213, 225, 0.8);
+}
+
+.options-form .form-control:focus,
+.options-form .form-select:focus,
+.options-form .form-check-input:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+}
+
+.options-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.options-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.options-import-label {
+  margin: 0;
+}
+
+.options-feedback {
+  min-height: 18px;
+  font-size: 13px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.feedback-success {
+  color: #059669;
+}
+
+.feedback-error {
+  color: #dc2626;
+}
+
 .folder-tree-card {
   display: flex;
   flex-direction: column;
   flex: 1;
+}
+
+.folder-tree-meta {
+  display: flex;
+  gap: 16px;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.folder-tree-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.folder-tree-meta-item strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.folder-tree-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.folder-tree-toolbar-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .folder-tree-header {
@@ -142,14 +345,40 @@ html, body {
   padding: 4px 2px;
 }
 
+.folder-tree-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.options-note {
+  font-size: 12px;
+  color: #475569;
+  margin: 0;
+}
+
 @media (max-width: 768px) {
   #root {
     margin: 8px auto;
     max-width: 100%;
   }
 
+  .options-root {
+    padding: 16px 12px 24px;
+  }
+
+  .options-page-header {
+    flex-direction: column;
+    padding: 0 0 16px;
+  }
+
+  .options-page-meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .options-card {
-    padding: 12px 12px;
+    padding: 16px;
   }
 
   .folder-tree-body {

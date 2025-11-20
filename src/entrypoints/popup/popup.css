@@ -1,40 +1,259 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-subtle: #eef2ff;
+  --border: rgba(148, 163, 184, 0.4);
+  --shadow-soft: 0 14px 28px rgba(15, 23, 42, 0.12);
+  --shadow-medium: 0 8px 20px rgba(15, 23, 42, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --muted: #94a3b8;
+  --accent: #2563eb;
+  --accent-contrast: #ffffff;
+  --success: #10b981;
+  --error: #ef4444;
+  --action-primary-bg: rgba(37, 99, 235, 0.14);
+  --action-primary-border: rgba(59, 130, 246, 0.5);
+  --action-primary-text: #1d4ed8;
+  --action-secondary-bg: rgba(14, 165, 233, 0.16);
+  --action-secondary-border: rgba(14, 165, 233, 0.45);
+  --action-secondary-text: #0ea5e9;
+  --action-danger-bg: rgba(239, 68, 68, 0.14);
+  --action-danger-border: rgba(239, 68, 68, 0.48);
+  --action-danger-text: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0b1220;
+    --surface: #131c2e;
+    --surface-subtle: #18253c;
+    --border: rgba(148, 163, 184, 0.25);
+    --shadow-soft: 0 16px 30px rgba(0, 0, 0, 0.45);
+    --shadow-medium: 0 12px 24px rgba(0, 0, 0, 0.4);
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5f5;
+    --muted: #94a3b8;
+    --accent: #60a5fa;
+    --accent-contrast: #0b1220;
+    --success: #34d399;
+    --error: #f87171;
+    --action-primary-bg: rgba(37, 99, 235, 0.26);
+    --action-primary-border: rgba(96, 165, 250, 0.55);
+    --action-primary-text: #93c5fd;
+    --action-secondary-bg: rgba(14, 165, 233, 0.28);
+    --action-secondary-border: rgba(125, 211, 252, 0.6);
+    --action-secondary-text: #a5f3fc;
+    --action-danger-bg: rgba(248, 113, 113, 0.28);
+    --action-danger-border: rgba(248, 113, 113, 0.6);
+    --action-danger-text: #fecaca;
+  }
+}
+
 #root {
-    width: 15rem;
-    min-height: 11rem;
-    height: auto;
-    position: relative;
+  width: 320px;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-.list-group-item {
-    padding: 0.25rem 1.25rem !important;
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'PingFang SC', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
-.card-header {
-    padding: 0.25rem 1rem !important;
+.popup-root {
+  padding: 16px 18px 20px;
+  min-height: 240px;
+  box-sizing: border-box;
+  background: var(--bg);
+  color: var(--text-primary);
 }
 
-.dropdown-menu {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-    border: none !important;
-    width: 100% !important;
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-.dropdown-item,
-.dropdown-item-text {
-    font-size: 12px !important;
-    padding: .5rem 1rem !important;
-    vertical-align: middle !important;
+.popup-heading h1 {
+  margin: 4px 0;
+  font-size: 20px;
+  color: var(--text-primary);
 }
 
-.dropdown-item-icon {
-    vertical-align: middle;
-    margin-right: 5px;
-    width: 1.1rem;
-    height: 1.1rem;
+.popup-eyebrow {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0;
 }
 
-.dropdown-item a,
-.dropdown-item-text a {
-    color: inherit;
+.popup-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.popup-settings {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-medium);
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.popup-settings:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.popup-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.popup-stat {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-medium);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.popup-stat span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.popup-stat strong {
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.popup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popup-action {
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--surface);
+  box-shadow: var(--shadow-medium);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+  color: var(--text-primary);
+}
+
+.popup-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.popup-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.popup-action-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.popup-action-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.popup-action-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.popup-action strong {
+  display: block;
+  font-size: 14px;
+  color: inherit;
+}
+
+.popup-action span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.popup-action.primary {
+  background: var(--action-primary-bg);
+  border-color: var(--action-primary-border);
+  color: var(--action-primary-text);
+}
+
+.popup-action.secondary {
+  background: var(--action-secondary-bg);
+  border-color: var(--action-secondary-border);
+  color: var(--action-secondary-text);
+}
+
+.popup-action.danger {
+  background: var(--action-danger-bg);
+  border-color: var(--action-danger-border);
+  color: var(--action-danger-text);
+}
+
+.popup-action-badge {
+  margin-left: auto;
+  font-size: 18px;
+  color: inherit;
+}
+
+.popup-footer {
+  margin-top: 14px;
+}
+
+.popup-feedback {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.popup-feedback.success {
+  color: var(--success);
+}
+
+.popup-feedback.error {
+  color: var(--error);
+}
+
+.popup-tip {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
 }
