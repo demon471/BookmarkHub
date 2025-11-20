@@ -61,6 +61,66 @@ export default defineBackground(() => {
       });
 
     }
+    if (msg.name === 'exportBookmarksToFile') {
+      (async () => {
+        try {
+          let bookmarks = await getBookmarks();
+          const selectedFolderIds = Array.isArray(msg.selectedFolderIds) ? (msg.selectedFolderIds as string[]) : undefined;
+          if (selectedFolderIds && selectedFolderIds.length) {
+            bookmarks = filterBookmarksBySelectedFolders(bookmarks, selectedFolderIds);
+          }
+
+          const syncdata = new SyncDataInfo();
+          syncdata.version = browser.runtime.getManifest().version;
+          syncdata.createDate = Date.now();
+          syncdata.bookmarks = formatBookmarks(bookmarks);
+          syncdata.browser = navigator.userAgent;
+
+          sendResponse({ ok: true, data: syncdata });
+        } catch (error: any) {
+          console.error('Export bookmarks to file error:', error);
+          sendResponse({ ok: false, error: error.message || String(error) });
+        }
+      })();
+    }
+    if (msg.name === 'importBookmarksFromFile') {
+      (async () => {
+        try {
+          const payload = msg.data;
+          if (!payload) {
+            throw new Error('导入数据为空');
+          }
+
+          let bookmarksData: BookmarkInfo[] | undefined;
+          if (Array.isArray(payload)) {
+            bookmarksData = payload as BookmarkInfo[];
+          } else if (Array.isArray(payload.bookmarks)) {
+            bookmarksData = payload.bookmarks as BookmarkInfo[];
+          } else {
+            throw new Error('JSON 中缺少 bookmarks 数组');
+          }
+
+          if (!bookmarksData || !bookmarksData.length) {
+            throw new Error('书签列表为空');
+          }
+
+          // 先检测当前浏览器类型
+          await getBookmarks();
+
+          curOperType = OperType.SYNC;
+          await createBookmarkTree(bookmarksData);
+          await updateBookmarkStructureTracking();
+          await refreshLocalCount();
+          curOperType = OperType.NONE;
+
+          sendResponse({ ok: true });
+        } catch (error: any) {
+          console.error('Import bookmarks from file error:', error);
+          curOperType = OperType.NONE;
+          sendResponse({ ok: false, error: error.message || String(error) });
+        }
+      })();
+    }
     if (msg.name === 'removeAll') {
       curOperType = OperType.REMOVE
       isClearing = true; // 设置清空标记

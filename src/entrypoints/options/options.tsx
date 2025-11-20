@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
+
 import ReactDOM from 'react-dom/client';
 import { Container, Form, Button, Col, Row, InputGroup, Modal } from 'react-bootstrap';
 
@@ -15,15 +16,22 @@ const Popup: React.FC = () => {
     const [saveMessage, setSaveMessage] = useState('');
     const [importMessage, setImportMessage] = useState('');
     const [syncing, setSyncing] = useState(false);
+    const [bookmarkActionLoading, setBookmarkActionLoading] = useState<'upload' | 'download' | null>(null);
+    const [bookmarkActionMessage, setBookmarkActionMessage] = useState('');
     const [folderTree, setFolderTree] = useState<any[] | null>(null);
+
     const [loadingTree, setLoadingTree] = useState(false);
     const [treeError, setTreeError] = useState('');
     const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
     const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
     const [allFolderIds, setAllFolderIds] = useState<string[]>([]);
 
+    const bookmarkActionMessageTimer = useRef<number | null>(null);
+    const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
+
     const folderSelectionStats = useMemo(() => {
         const total = allFolderIds.length;
+
         const selected = selectedFolderIds.length;
         const excluded = Math.max(total - selected, 0);
         const coverage = total > 0 ? Math.round((selected / total) * 100) : 0;
@@ -297,6 +305,22 @@ const Popup: React.FC = () => {
         event.target.value = '';
     };
 
+    useEffect(() => {
+        return () => {
+            if (bookmarkActionMessageTimer.current) {
+                window.clearTimeout(bookmarkActionMessageTimer.current);
+            }
+        };
+    }, []);
+
+    const persistSelectedFolders = async () => {
+        const excludedFolderIds = allFolderIds.filter(id => !selectedFolderIds.includes(id));
+        await browser.storage.local.set({
+            selectedFolderIds,
+            excludedFolderIds,
+        });
+    };
+
     const handleConfirmUpload = async () => {
         setSyncing(true);
         try {
@@ -305,18 +329,96 @@ const Popup: React.FC = () => {
                 selectedFolderIds,
             });
 
-            // 只有上传成功时才持久化当前选择的文件夹
             if (result) {
-                const excludedFolderIds = allFolderIds.filter(id => !selectedFolderIds.includes(id));
-                await browser.storage.local.set({
-                    selectedFolderIds,
-                    excludedFolderIds,
-                });
+                await persistSelectedFolders();
             }
         } catch (error) {
             console.error('Confirm upload error:', error);
         } finally {
             setSyncing(false);
+        }
+    };
+
+    const showBookmarkActionMessage = (message: string) => {
+        setBookmarkActionMessage(message);
+        if (bookmarkActionMessageTimer.current) {
+            window.clearTimeout(bookmarkActionMessageTimer.current);
+        }
+        bookmarkActionMessageTimer.current = window.setTimeout(() => {
+            setBookmarkActionMessage('');
+            bookmarkActionMessageTimer.current = null;
+        }, 4000);
+    };
+
+    const handleManualBookmarkUpload = () => {
+        if (bookmarkFileInputRef.current) {
+            bookmarkFileInputRef.current.click();
+        }
+    };
+
+    const handleBookmarkFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        setBookmarkActionLoading('upload');
+        try {
+            const text = await file.text();
+            let payload: any;
+            try {
+                payload = JSON.parse(text);
+            } catch {
+                throw new Error('文件内容不是有效的 JSON');
+            }
+
+            const result = await browser.runtime.sendMessage({
+                name: 'importBookmarksFromFile',
+                data: payload,
+            });
+
+            if (result && result.ok) {
+                showBookmarkActionMessage('✅ 已从文件导入书签');
+            } else {
+                throw new Error(result?.error || 'Import failed');
+            }
+        } catch (error: any) {
+            console.error('Manual bookmark file import error:', error);
+            showBookmarkActionMessage(`❌ 导入失败：${error.message || '请检查文件格式'}`);
+        } finally {
+            setBookmarkActionLoading(null);
+            event.target.value = '';
+        }
+    };
+
+    const handleManualBookmarkDownload = async () => {
+        setBookmarkActionLoading('download');
+        try {
+            const result = await browser.runtime.sendMessage({
+                name: 'exportBookmarksToFile',
+                selectedFolderIds,
+            });
+
+            if (!result || !result.ok || !result.data) {
+                throw new Error(result?.error || 'Export failed');
+            }
+
+            const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `bookmarkhub-bookmarks-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showBookmarkActionMessage('✅ 已导出书签到文件');
+        } catch (error: any) {
+            console.error('Manual bookmark export error:', error);
+            showBookmarkActionMessage(`❌ 导出失败：${error.message || '请稍后重试'}`);
+        } finally {
+            setBookmarkActionLoading(null);
         }
     };
 
@@ -449,8 +551,8 @@ const Popup: React.FC = () => {
                         <strong>{folderSelectionStats.coverage}%</strong>
                     </div>
                 </div>
-                </div>
-                <Row className="options-layout">
+            </div>
+            <Row className="options-layout">
                 <Col xs={12} md={6} lg={6} className="options-col">
 
                     <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)} className="options-form">
@@ -614,11 +716,61 @@ const Popup: React.FC = () => {
                                             onChange={handleImportConfig}
                                             style={{ display: 'none' }}
                                         />
+
+                                        <input
+                                            id="importBookmarksFile"
+                                            type="file"
+                                            accept=".json"
+                                            ref={bookmarkFileInputRef}
+                                            onChange={handleBookmarkFileChange}
+                                            style={{ display: 'none' }}
+                                        />
+
+                                        <Button
+                                            type="button"
+                                            className="options-action-button options-action-button--bookmark-upload"
+                                            disabled={bookmarkActionLoading === 'upload'}
+                                            onClick={handleManualBookmarkUpload}
+                                        >
+                                            <span className="options-action-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                    <path d="M4 14a4 4 0 0 1 4-4h1" />
+                                                    <path d="M13 10h3a4 4 0 1 1 0 8h-2" />
+                                                    <path d="M12 16V6" />
+                                                    <path d="M9 9l3-3 3 3" />
+                                                </svg>
+                                            </span>
+                                            <span className="options-action-copy">
+                                                <span className="options-action-title">上传书签</span>
+                                                <span className="options-action-subtitle">从外部文件上传书签到浏览器</span>
+                                            </span>
+                                        </Button>
+
+                                        <Button
+                                            type="button"
+                                            className="options-action-button options-action-button--bookmark-download"
+                                            disabled={bookmarkActionLoading === 'download'}
+                                            onClick={handleManualBookmarkDownload}
+                                        >
+                                            <span className="options-action-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                    <path d="M20 13a4 4 0 0 0-4-4h-1" />
+                                                    <path d="M11 9H8a4 4 0 1 0 0 8h2" />
+                                                    <path d="M12 8v10" />
+                                                    <path d="M9 15l3 3 3-3" />
+                                                </svg>
+                                            </span>
+                                            <span className="options-action-copy">
+                                                <span className="options-action-title">导出书签</span>
+                                                <span className="options-action-subtitle">从本地书签导出到外部文件</span>
+                                            </span>
+                                        </Button>
                                     </div>
 
                                     <div className="options-feedback">
                                         {saveMessage && <span className={saveMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{saveMessage}</span>}
                                         {importMessage && <span className={importMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{importMessage}</span>}
+                                        {bookmarkActionMessage && <span className={bookmarkActionMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{bookmarkActionMessage}</span>}
                                     </div>
                                 </div>
                             </div>
