@@ -596,28 +596,12 @@ const Popup: React.FC = () => {
                                 <h2 className="options-card-title">同步范围预览</h2>
                                 <p className="options-card-desc">只需勾选即可定义同步范围，BookmarkHub 会记住您的选择。</p>
                             </div>
-                            <div className="folder-tree-meta">
-                                <div className="folder-tree-meta-item">
-                                    <span>总数</span>
-                                    <strong>{folderSelectionStats.total}</strong>
-                                </div>
-                                <div className="folder-tree-meta-item">
-                                    <span>已选</span>
-                                    <strong>{folderSelectionStats.selected}</strong>
-                                </div>
-                                <div className="folder-tree-meta-item">
-                                    <span>覆盖率</span>
-                                    <strong>{folderSelectionStats.coverage}%</strong>
-                                </div>
-                            </div>
                         </div>
                         <div className="options-card-body">
                             <div className="folder-tree-toolbar">
-                                <div>
-                                    <p className="options-card-desc" style={{ marginBottom: 0 }}>
-                                        {loadingTree ? '正在加载书签…' : '勾选任意文件夹即可包含其全部子目录。'}
-                                    </p>
-                                </div>
+                                <p className="options-card-desc" style={{ marginBottom: 0 }}>
+                                    {loadingTree ? '正在加载书签…' : '勾选任意文件夹即可包含其全部子目录。'}
+                                </p>
                                 <div className="folder-tree-toolbar-actions">
                                     <Button
                                         variant="outline-secondary"
