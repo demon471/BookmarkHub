@@ -2,8 +2,8 @@ name: 构建扩展 CRX 并附加到 Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 jobs:
   build-crx:
@@ -30,8 +30,10 @@ jobs:
       - name: 读取包名和版本号
         id: pkg
         run: |
-          echo "name=$(node -p \"require('./package.json').name\")" >> $GITHUB_OUTPUT
-          echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: 准备 CRX 私钥
         working-directory: .output/chrome-mv3
@@ -60,6 +62,7 @@ jobs:
       - name: 上传 ZIP 到 Release
         uses: svenstaro/upload-release-action@v2
         with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.pack.outputs.zip_path }}
           asset_name: ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}-chrome.zip
           tag: ${{ github.ref_name }}
@@ -68,6 +71,7 @@ jobs:
       - name: 上传 CRX 到 Release
         uses: svenstaro/upload-release-action@v2
         with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ steps.pack.outputs.crx_path }}
           asset_name: ${{ steps.pkg.outputs.name }}-${{ steps.pkg.outputs.version }}-chrome.crx
           tag: ${{ github.ref_name }}
