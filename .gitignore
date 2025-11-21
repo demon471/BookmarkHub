@@ -13,6 +13,11 @@ stats.html
 stats-*.json
 .wxt
 web-ext.config.ts
+dist/
+coverage/
+.turbo
+.cache
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
