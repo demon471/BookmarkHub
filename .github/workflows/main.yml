@@ -1,8 +1,9 @@
 name: 构建扩展 CRX 并附加到 Release
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
 
 jobs:
   build-crx:
