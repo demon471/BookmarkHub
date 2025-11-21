@@ -511,7 +511,11 @@ const Popup: React.FC = () => {
                                         disabled={isRoot}
                                         onChange={isRoot ? undefined : () => handleToggleFolder(node.id)}
                                     />
-                                    <span className="folder-icon" />
+                                    <span className="folder-icon" aria-hidden="true">
+                                        <svg viewBox="0 0 20 20" role="presentation" focusable="false">
+                                            <path d="M3 6.5h3.4l1.2 1.8H17a1 1 0 0 1 1 1v6.2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" />
+                                        </svg>
+                                    </span>
                                     <span className="folder-title">{node.title || '(未命名文件夹)'}</span>
                                 </div>
                                 <span className="folder-count">{folderBookmarkCount[node.id] ?? 0}</span>
