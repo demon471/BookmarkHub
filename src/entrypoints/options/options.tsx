@@ -794,23 +794,40 @@ const Popup: React.FC = () => {
                                 </p>
                                 <div className="folder-tree-toolbar-actions">
                                     <Button
-                                        variant="outline-secondary"
-                                        size="sm"
+                                        type="button"
+                                        className="folder-tree-action-button folder-tree-action-button--refresh"
                                         onClick={loadFolderTree}
                                         disabled={loadingTree}
                                     >
-                                        {loadingTree ? '刷新中…' : '刷新'}
+                                        <span className="folder-tree-action-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                <path d="M21 12a9 9 0 1 1-9-9" />
+                                                <path d="M21 3v9h-9" />
+                                            </svg>
+                                        </span>
+                                        <span className="folder-tree-action-label">
+                                            {loadingTree ? '刷新中…' : '刷新'}
+                                        </span>
                                     </Button>
                                     <Button
-                                        variant="primary"
-                                        size="sm"
+                                        type="button"
+                                        className="folder-tree-action-button folder-tree-action-button--save"
                                         onClick={handleConfirmUpload}
                                         disabled={syncing || !folderTree}
                                     >
-                                        {syncing ? '上传中…' : '保存选择'}
+                                        <span className="folder-tree-action-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                <circle cx="12" cy="12" r="10" />
+                                                <path d="M9 12.5l2 2L15 10" />
+                                            </svg>
+                                        </span>
+                                        <span className="folder-tree-action-label">
+                                            {syncing ? '上传中…' : '保存选择'}
+                                        </span>
                                     </Button>
                                 </div>
                             </div>
+
                             <div className="folder-tree-body">
                                 {treeError && <div className="folder-tree-error">{treeError}</div>}
                                 {!treeError && !folderTree && loadingTree && (
