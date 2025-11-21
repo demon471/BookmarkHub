@@ -12,6 +12,9 @@ export class SettingBase implements Options {
     autoSyncEnabled: boolean = false;
     autoSyncInterval: number = 15; // minutes
     lastSyncTime: number = 0; // timestamp
+    // Encryption configuration
+    enableEncrypt: boolean = false;
+    encryptPassword: string = '';
 }
 export class Setting extends SettingBase {
     private constructor() { super() }
@@ -26,6 +29,9 @@ export class Setting extends SettingBase {
         setting.autoSyncEnabled = options.autoSyncEnabled || false;
         setting.autoSyncInterval = options.autoSyncInterval || 15;
         setting.lastSyncTime = options.lastSyncTime || 0;
+        // Encryption configuration mapping
+        setting.enableEncrypt = options.enableEncrypt || false;
+        setting.encryptPassword = options.encryptPassword || '';
         return setting;
     }
 }

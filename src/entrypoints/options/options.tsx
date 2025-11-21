@@ -11,7 +11,7 @@ import optionsStorage from '../../utils/optionsStorage'
 
 const Popup: React.FC = () => {
 
-    const { register, setValue, handleSubmit } = useForm();
+    const { register, setValue, handleSubmit, watch } = useForm();
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
     const [importMessage, setImportMessage] = useState('');
@@ -25,6 +25,7 @@ const Popup: React.FC = () => {
     const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([]);
     const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
     const [allFolderIds, setAllFolderIds] = useState<string[]>([]);
+    const [showEncryptPassword, setShowEncryptPassword] = useState(false);
 
     const bookmarkActionMessageTimer = useRef<number | null>(null);
     const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -37,6 +38,8 @@ const Popup: React.FC = () => {
         const coverage = total > 0 ? Math.round((selected / total) * 100) : 0;
         return { total, selected, excluded, coverage };
     }, [selectedFolderIds, allFolderIds]);
+
+    const encryptEnabled = !!watch('enableEncrypt');
 
     const buildFolderMeta = (nodes: any[] | null) => {
         const counts: { [id: string]: number } = {};
@@ -75,6 +78,8 @@ const Popup: React.FC = () => {
         setValue('enableNotify', options.enableNotify !== false);
         setValue('autoSyncEnabled', options.autoSyncEnabled || false);
         setValue('autoSyncInterval', options.autoSyncInterval || 15);
+        setValue('enableEncrypt', options.enableEncrypt || false);
+        setValue('encryptPassword', options.encryptPassword || '');
     };
 
     const loadFolderTree = async () => {
@@ -155,7 +160,9 @@ const Popup: React.FC = () => {
                 gistFileName: data.gistFileName || 'BookmarkHub',
                 enableNotify: data.enableNotify !== false,
                 autoSyncEnabled: data.autoSyncEnabled || false,
-                autoSyncInterval: parseInt(data.autoSyncInterval) || 15
+                autoSyncInterval: parseInt(data.autoSyncInterval) || 15,
+                enableEncrypt: data.enableEncrypt || false,
+                encryptPassword: data.encryptPassword || ''
             });
 
             console.log('✅ Configuration saved:', {
@@ -211,7 +218,9 @@ const Popup: React.FC = () => {
                     gistFileName: config.gistFileName || 'BookmarkHub',
                     enableNotify: config.enableNotify !== false,
                     autoSyncEnabled: config.autoSyncEnabled || false,
-                    autoSyncInterval: config.autoSyncInterval || 15
+                    autoSyncInterval: config.autoSyncInterval || 15,
+                    enableEncrypt: config.enableEncrypt || false,
+                    encryptPassword: config.encryptPassword || ''
                 }
             };
 
@@ -253,7 +262,9 @@ const Popup: React.FC = () => {
                 gistFileName: importData.config.gistFileName || 'BookmarkHub',
                 enableNotify: importData.config.enableNotify !== false,
                 autoSyncEnabled: importData.config.autoSyncEnabled || false,
-                autoSyncInterval: importData.config.autoSyncInterval || 15
+                autoSyncInterval: importData.config.autoSyncInterval || 15,
+                enableEncrypt: importData.config.enableEncrypt || false,
+                encryptPassword: importData.config.encryptPassword || ''
             };
 
             // 保存导入的配置
@@ -602,7 +613,7 @@ const Popup: React.FC = () => {
 
                                 <div className="options-section">
                                     <div className="options-section-title">同步偏好</div>
-                                    <div className="options-section-body">
+                                    <div className="options-section-body" style={{ marginBottom: 0 }}>
                                         <Form.Group as={Row} className="options-form-group">
                                             <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('enableNotifications')}</Form.Label>
                                             <Col sm={9} lg={10} xs={9}>
@@ -626,11 +637,15 @@ const Popup: React.FC = () => {
                                                     type="switch"
                                                     defaultChecked={false}
                                                 />
+                                            </Col>
+                                        </Form.Group>
+                                        <Row className="options-form-helper-row">
+                                            <Col sm={{ span: 9, offset: 3 }} lg={{ span: 10, offset: 2 }} xs={{ span: 9, offset: 3 }}>
                                                 <Form.Text className="text-muted">
                                                     定期从远程拉取书签并合并到本地（不会删除本地书签）
                                                 </Form.Text>
                                             </Col>
-                                        </Form.Group>
+                                        </Row>
 
                                         <Form.Group as={Row} className="options-form-group">
                                             <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncInterval')}</Form.Label>
@@ -647,11 +662,84 @@ const Popup: React.FC = () => {
                                                     <option value="30">{browser.i18n.getMessage('autoSyncInterval30')}</option>
                                                     <option value="60">{browser.i18n.getMessage('autoSyncInterval60')}</option>
                                                 </Form.Control>
+                                            </Col>
+                                        </Form.Group>
+                                        <Row className="options-form-helper-row">
+                                            <Col sm={{ span: 9, offset: 3 }} lg={{ span: 10, offset: 2 }} xs={{ span: 9, offset: 3 }}>
                                                 <Form.Text className="text-muted">
                                                     自动同步的时间间隔
                                                 </Form.Text>
                                             </Col>
+                                        </Row>
+
+                                        <Form.Group as={Row} className="options-form-group">
+                                            <Form.Label column="sm" sm={3} lg={2} xs={3} className="options-label-danger">启用加密</Form.Label>
+                                            <Col sm={9} lg={10} xs={9}>
+                                                <Form.Check
+                                                    id="enableEncrypt"
+                                                    name="enableEncrypt"
+                                                    ref={register}
+                                                    type="switch"
+                                                    defaultChecked={false}
+                                                />
+                                            </Col>
                                         </Form.Group>
+                                        <Row className="options-form-helper-row">
+                                            <Col sm={{ span: 9, offset: 3 }} lg={{ span: 10, offset: 2 }} xs={{ span: 9, offset: 3 }}>
+                                                <Form.Text className="text-muted">
+                                                    使用自定义密码对远程数据加密存储
+                                                </Form.Text>
+                                            </Col>
+                                        </Row>
+
+                                        {encryptEnabled && (
+                                            <Form.Group as={Row} className="options-form-group">
+                                                <Form.Label column="sm" sm={3} lg={2} xs={3}>加密密码</Form.Label>
+                                                <Col sm={9} lg={10} xs={9}>
+                                                    <div className="options-password-input-wrapper">
+                                                        <Form.Control
+                                                            name="encryptPassword"
+                                                            ref={register}
+                                                            type={showEncryptPassword ? 'text' : 'password'}
+                                                            placeholder="请输入用于加密的密码"
+                                                            size="sm"
+                                                        />
+                                                        <Button
+                                                            variant="link"
+                                                            size="sm"
+                                                            className={`options-password-toggle-btn ${showEncryptPassword ? 'options-password-toggle-btn--active' : ''}`}
+                                                            onClick={() => setShowEncryptPassword(prev => !prev)}
+                                                            aria-label={showEncryptPassword ? '隐藏密码' : '查看密码'}
+                                                        >
+                                                            <span className="options-password-toggle-icon" aria-hidden="true">
+                                                                {showEncryptPassword ? (
+                                                                    <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                                        <path d="M3 3l18 18" />
+                                                                        <path d="M10.58 10.58A3 3 0 0 0 13.42 13.42" />
+                                                                        <path d="M9.88 5.51A9.77 9.77 0 0 1 12 5c7 0 10 7 10 7a14.48 14.48 0 0 1-3.17 4.19" />
+                                                                        <path d="M6.61 6.61C4.24 7.88 2.54 9.94 2 12c0 0 3 7 10 7a9.52 9.52 0 0 0 4.39-1.06" />
+                                                                    </svg>
+                                                                ) : (
+                                                                    <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z" />
+                                                                        <circle cx="12" cy="12" r="3" />
+                                                                    </svg>
+                                                                )}
+                                                            </span>
+                                                        </Button>
+                                                    </div>
+                                                </Col>
+                                            </Form.Group>
+                                        )}
+                                        {encryptEnabled && (
+                                            <Row className="options-form-helper-row">
+                                                <Col sm={{ span: 9, offset: 3 }} lg={{ span: 10, offset: 2 }} xs={{ span: 9, offset: 3 }}>
+                                                    <Form.Text className="text-muted">
+                                                        仅保存在本地和配置导出文件中，请妥善保管
+                                                    </Form.Text>
+                                                </Col>
+                                            </Row>
+                                        )}
                                     </div>
                                 </div>
 

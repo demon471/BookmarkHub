@@ -202,7 +202,7 @@ html, body {
 .options-section-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .options-form-group {
@@ -214,6 +214,87 @@ html, body {
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+.options-form-group .col-form-label-sm {
+  padding-top: 0;
+  padding-bottom: 0;
+  display: flex;
+  align-items: center;
+}
+
+.options-form-group .options-label-danger {
+  color: #f97373;
+}
+
+.options-form-group .form-check {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.options-form-group .form-check-input {
+  margin-top: 0;
+}
+
+.options-password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.options-password-input-wrapper .form-control {
+  padding-right: 32px; /* 为右侧眼睛图标预留空间 */
+  padding-top: 4px;
+  padding-bottom: 2px;
+}
+
+.options-password-input-wrapper .options-password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0;
+}
+
+.options-password-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 8px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.options-password-toggle-btn:hover,
+.options-password-toggle-btn:focus {
+  background: transparent;
+  box-shadow: none;
+}
+
+.options-password-toggle-btn--active {
+  color: var(--accent);
+}
+
+.options-password-toggle-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.options-password-toggle-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .options-form .form-control,
