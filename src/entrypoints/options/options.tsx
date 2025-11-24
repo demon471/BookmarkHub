@@ -544,7 +544,7 @@ const Popup: React.FC = () => {
                         return null;
                     }
                     const isRoot = !node.parentId && index === 0;
-                    const hasChildFolder = node.children && node.children.some(child => !child.url);
+                    const hasChildFolder = node.children && node.children.some((child: any) => !child.url);
                     return (
                         <li key={node.id}>
                             <div className="folder-tree-item">
@@ -578,8 +578,28 @@ const Popup: React.FC = () => {
         loadFolderTree();
     }, []);
 
+    const renderGlobalToast = (message: string, key: string) => {
+        const isSuccess = message.startsWith('✅');
+        const cleanMessage = message.replace(/^✅\s*/, '').replace(/^❌\s*/, '');
+        return (
+            <div key={key} className={`options-toast ${isSuccess ? 'options-toast--success' : 'options-toast--error'}`}>
+                <div className="options-toast-icon">
+                    {isSuccess ? '✓' : '!'}
+                </div>
+                <div className="options-toast-message">{cleanMessage}</div>
+            </div>
+        );
+    };
+
     return (
         <Container className="options-root">
+            {(saveMessage || importMessage || bookmarkActionMessage) && (
+                <div className="options-toast-container">
+                    {saveMessage && renderGlobalToast(saveMessage, 'save')}
+                    {importMessage && renderGlobalToast(importMessage, 'import')}
+                    {bookmarkActionMessage && renderGlobalToast(bookmarkActionMessage, 'bookmark')}
+                </div>
+            )}
             <div className="options-page-header">
                 <div className="options-heading">
                     <p className="options-eyebrow">BookmarkHub</p>
@@ -893,11 +913,7 @@ const Popup: React.FC = () => {
                                         </Button>
                                     </div>
 
-                                    <div className="options-feedback">
-                                        {saveMessage && <span className={saveMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{saveMessage}</span>}
-                                        {importMessage && <span className={importMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{importMessage}</span>}
-                                        {bookmarkActionMessage && <span className={bookmarkActionMessage.startsWith('✅') ? 'feedback-success' : 'feedback-error'}>{bookmarkActionMessage}</span>}
-                                    </div>
+                                    <div className="options-feedback" />
                                 </div>
                             </div>
                         </div>
