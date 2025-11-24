@@ -32,13 +32,62 @@ const Popup: React.FC = () => {
     const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
 
     const folderSelectionStats = useMemo(() => {
-        const total = allFolderIds.length;
+        const totalFolders = allFolderIds.length;
+        const selectedFolders = selectedFolderIds.length;
+        const excludedFolders = Math.max(totalFolders - selectedFolders, 0);
 
-        const selected = selectedFolderIds.length;
-        const excluded = Math.max(total - selected, 0);
-        const coverage = total > 0 ? Math.round((selected / total) * 100) : 0;
-        return { total, selected, excluded, coverage };
-    }, [selectedFolderIds, allFolderIds]);
+        let coverage = 0;
+
+        if (folderTree && folderTree.length > 0) {
+            const rootNode = folderTree[0];
+            const rootId = rootNode.id;
+            const totalBookmarks = folderBookmarkCount[rootId] ?? 0;
+
+            if (totalBookmarks > 0) {
+                const excludedFolderIds = allFolderIds.filter(id => !selectedFolderIds.includes(id));
+
+                const parentMap: { [id: string]: string | null } = {};
+                const stack: any[] = [...folderTree];
+                while (stack.length) {
+                    const node = stack.pop();
+                    if (!node || node.url) {
+                        continue;
+                    }
+                    if (!(node.id in parentMap)) {
+                        parentMap[node.id] = node.parentId ?? null;
+                    }
+                    if (node.children && node.children.length) {
+                        for (const child of node.children) {
+                            stack.push(child);
+                        }
+                    }
+                }
+
+                const excludedRoots = new Set<string>();
+                for (const id of excludedFolderIds) {
+                    const parentId = parentMap[id];
+                    if (!parentId || selectedFolderIds.includes(parentId)) {
+                        excludedRoots.add(id);
+                    }
+                }
+
+                const excludedBookmarks = Array.from(excludedRoots).reduce((sum, id) => {
+                    const count = folderBookmarkCount[id] ?? 0;
+                    return sum + count;
+                }, 0);
+
+                const coveredBookmarks = Math.max(totalBookmarks - excludedBookmarks, 0);
+                coverage = Math.round((coveredBookmarks / totalBookmarks) * 100);
+            }
+        }
+
+        return {
+            total: totalFolders,
+            selected: selectedFolders,
+            excluded: excludedFolders,
+            coverage,
+        };
+    }, [selectedFolderIds, allFolderIds, folderTree, folderBookmarkCount]);
 
     const encryptEnabled = !!watch('enableEncrypt');
 
