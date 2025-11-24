@@ -11,7 +11,7 @@ import optionsStorage from '../../utils/optionsStorage'
 
 const Popup: React.FC = () => {
 
-    const { register, setValue, handleSubmit, watch, reset } = useForm();
+    const { register, setValue, handleSubmit, watch, reset, getValues } = useForm();
 
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
@@ -338,6 +338,33 @@ const Popup: React.FC = () => {
     const handleConfirmUpload = async () => {
         setSyncing(true);
         try {
+            // 1）仅在加密相关配置有变化时才写入 optionsStorage
+            try {
+                const stored = await optionsStorage.getAll();
+                const values: any = getValues();
+
+                const prevEnableEncrypt = !!stored.enableEncrypt;
+                const prevEncryptPassword = stored.encryptPassword || '';
+
+                const nextEnableEncrypt = !!values.enableEncrypt;
+                const nextEncryptPasswordRaw = values.encryptPassword || '';
+
+                const encryptChanged =
+                    prevEnableEncrypt !== nextEnableEncrypt ||
+                    prevEncryptPassword !== nextEncryptPasswordRaw;
+
+                if (encryptChanged) {
+                    // 如果关闭加密，则同时清空密码
+                    await optionsStorage.set({
+                        enableEncrypt: nextEnableEncrypt,
+                        encryptPassword: nextEnableEncrypt ? nextEncryptPasswordRaw : '',
+                    });
+                }
+            } catch (e) {
+                console.error('Persist encrypt settings on folder selection failed:', e);
+            }
+
+            // 2）触发上传，并在成功后持久化文件夹选择
             const result = await browser.runtime.sendMessage({
                 name: 'upload',
                 selectedFolderIds,
@@ -345,9 +372,13 @@ const Popup: React.FC = () => {
 
             if (result) {
                 await persistSelectedFolders();
+                showBookmarkActionMessage('✅ 已保存同步范围并触发上传');
+            } else {
+                showBookmarkActionMessage('❌ 保存选择或上传失败，请稍后重试');
             }
         } catch (error) {
             console.error('Confirm upload error:', error);
+            showBookmarkActionMessage(`❌ 保存选择或上传失败：${(error as any)?.message || '请稍后重试'}`);
         } finally {
             setSyncing(false);
         }

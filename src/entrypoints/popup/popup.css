@@ -257,3 +257,97 @@ body {
   color: var(--text-secondary);
   text-align: center;
 }
+
+.popup-encrypt-hint {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.popup-encrypt-button {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.popup-encrypt-button:hover {
+  text-decoration: underline;
+}
+
+.popup-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.popup-modal {
+  width: 260px;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border);
+}
+
+.popup-modal-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.popup-modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.popup-modal-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.popup-modal-error {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--error);
+}
+
+.popup-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.popup-modal-btn {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.popup-modal-btn.primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.popup-modal-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}

@@ -309,7 +309,7 @@ export default defineBackground(() => {
     }
   });
 
-  async function showSyncBadge(status: 'syncing' | 'success' | 'error') {
+  async function showSyncBadge(status: 'syncing' | 'success' | 'error' | 'password') {
 
     if (badgeTimeoutId) {
       clearTimeout(badgeTimeoutId);
@@ -321,6 +321,12 @@ export default defineBackground(() => {
       await browser.action.setBadgeBackgroundColor({ color: '#007bff' });
     } else if (status === 'success') {
       await browser.action.setBadgeText({ text: '' });
+    } else if (status === 'password') {
+      await browser.action.setBadgeBackgroundColor({ color: '#b91c1c' });
+      await browser.action.setBadgeText({ text: '密' });
+      badgeTimeoutId = setTimeout(async () => {
+        await browser.action.setBadgeText({ text: '' });
+      }, 5000);
     } else {
       await browser.action.setBadgeText({ text: '!' });
       await browser.action.setBadgeBackgroundColor({ color: '#dc3545' });
@@ -355,11 +361,16 @@ export default defineBackground(() => {
       if (isAesEncryptedPayload(parsed)) {
         if (!setting.enableEncrypt || !setting.encryptPassword) {
           console.error('Remote data is encrypted but encryption is disabled or password is empty');
-          throw new Error('远程数据已加密，请在设置中启用加密并填写正确的加密密码后重试。');
+          throw new Error('远程数据已加密，请设置并填写正确的加密密码后重试。');
         }
 
-        const decryptedText = await decryptStringWithPassword(parsed, setting.encryptPassword);
-        return JSON.parse(decryptedText) as SyncDataInfo;
+        try {
+          const decryptedText = await decryptStringWithPassword(parsed, setting.encryptPassword);
+          return JSON.parse(decryptedText) as SyncDataInfo;
+        } catch (e) {
+          console.error('Failed to decrypt encrypted remote data with provided password:', e);
+          throw new Error('远程数据已加密，当前密码解密失败，请检查密码是否正确。');
+        }
       }
 
       return parsed as SyncDataInfo;
@@ -677,31 +688,46 @@ export default defineBackground(() => {
     } catch (error: any) {
       console.error(error);
       isClearing = false; // 确保错误时也清除标志
-      // 只在配置问题时显示一次提示
-      const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
-      if (isConfigError) {
-        const { lastConfigErrorNotified } = await browser.storage.local.get(['lastConfigErrorNotified']);
-        const now = Date.now();
-        // 只在1小时内显示一次配置错误
-        if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
-          await browser.storage.local.set({ lastConfigErrorNotified: now });
+
+      const message = error?.message || String(error || '');
+      const isPasswordError = message.includes('远程数据已加密');
+
+      // 根据错误类型更新图标状态，并在密码错误时提醒弹窗
+      if (isPasswordError) {
+        await showSyncBadge('password');
+        try {
+          await browser.runtime.sendMessage({ name: 'requireEncryptPassword' });
+        } catch (e) {
+          console.error('Failed to notify popup for encrypt password:', e);
+        }
+      } else {
+        await showSyncBadge('error');
+        // 只在配置问题时显示一次提示
+        const isConfigError = message.includes('token') || message.includes('gist') || message.includes('401');
+        if (isConfigError) {
+          const { lastConfigErrorNotified } = await browser.storage.local.get(['lastConfigErrorNotified']);
+          const now = Date.now();
+          // 只在1小时内显示一次配置错误
+          if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
+            await browser.storage.local.set({ lastConfigErrorNotified: now });
+            await browser.notifications.create({
+              type: 'basic',
+              iconUrl: iconLogo,
+              title: browser.i18n.getMessage('downloadBookmarks'),
+              message: `${browser.i18n.getMessage('error')}：${message}`
+            });
+          } else {
+            console.log('⏸️ Config error notification suppressed (already notified recently)');
+          }
+        } else {
+          // 非配置错误，正常提示
           await browser.notifications.create({
             type: 'basic',
             iconUrl: iconLogo,
             title: browser.i18n.getMessage('downloadBookmarks'),
-            message: `${browser.i18n.getMessage('error')}：${error.message}`
+            message: `${browser.i18n.getMessage('error')}：${message}`
           });
-        } else {
-          console.log('⏸️ Config error notification suppressed (already notified recently)');
         }
-      } else {
-        // 非配置错误，正常提示
-        await browser.notifications.create({
-          type: 'basic',
-          iconUrl: iconLogo,
-          title: browser.i18n.getMessage('downloadBookmarks'),
-          message: `${browser.i18n.getMessage('error')}：${error.message}`
-        });
       }
     }
   }

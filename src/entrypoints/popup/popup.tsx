@@ -7,6 +7,7 @@ import {
 } from 'react-icons/ai'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './popup.css'
+import optionsStorage from '../../utils/optionsStorage'
 
 type ActionName = 'upload' | 'download' | 'removeAll';
 
@@ -14,6 +15,12 @@ const Popup: React.FC = () => {
     const [count, setCount] = useState({ local: "0", remote: "0", excluded: "0" })
     const [actionLoading, setActionLoading] = useState<ActionName | null>(null);
     const [statusMessage, setStatusMessage] = useState('');
+    const [encryptEnabled, setEncryptEnabled] = useState(false)
+    const [encryptPassword, setEncryptPassword] = useState('')
+    const [showEncryptModal, setShowEncryptModal] = useState(false)
+    const [encryptSaving, setEncryptSaving] = useState(false)
+    const [encryptError, setEncryptError] = useState('')
+    const [pendingRetryAction, setPendingRetryAction] = useState<ActionName | null>(null)
 
     const refreshCounts = async () => {
         const data = await browser.storage.local.get(["localCount", "remoteCount"]);
@@ -40,6 +47,35 @@ const Popup: React.FC = () => {
         return () => {
             browser.storage.onChanged.removeListener(handleChange);
         };
+    }, [])
+
+    // 加载当前加密配置到弹窗状态
+    useEffect(() => {
+        (async () => {
+            try {
+                const opts = await optionsStorage.getAll()
+                setEncryptEnabled(!!opts.enableEncrypt)
+                setEncryptPassword(opts.encryptPassword || '')
+            } catch (e) {
+                console.error('Load encrypt settings from popup failed:', e)
+            }
+        })()
+    }, [])
+
+    // 监听后台发来的加密密码错误提示
+    useEffect(() => {
+        const listener = (msg: any) => {
+            if (msg && msg.name === 'requireEncryptPassword') {
+                setEncryptError('远程数据已加密或密码错误，请设置正确的加密密码后重试。')
+                setPendingRetryAction('download')
+                setShowEncryptModal(true)
+                setStatusMessage('')
+            }
+        }
+        browser.runtime.onMessage.addListener(listener)
+        return () => {
+            browser.runtime.onMessage.removeListener(listener)
+        }
     }, [])
 
     const runAction = async (name: ActionName) => {
@@ -78,6 +114,42 @@ const Popup: React.FC = () => {
             console.error('Open settings error:', error);
         }
     };
+
+    const openEncryptModal = () => {
+        setEncryptError('')
+        setShowEncryptModal(true)
+    }
+
+    const handleSaveEncryptSettings = async () => {
+        setEncryptError('')
+        setEncryptSaving(true)
+        const shouldRetryDownload = pendingRetryAction === 'download'
+        try {
+            const finalEnable = encryptEnabled
+            if (finalEnable && !encryptPassword) {
+                setEncryptError('请输入加密密码')
+                setEncryptSaving(false)
+                return
+            }
+            await optionsStorage.set({
+                enableEncrypt: finalEnable,
+                encryptPassword: finalEnable ? encryptPassword : '',
+            })
+            setStatusMessage('✅ 加密设置已保存')
+            setTimeout(() => setStatusMessage(''), 4000)
+            setShowEncryptModal(false)
+            setPendingRetryAction(null)
+
+            if (shouldRetryDownload) {
+                await runAction('download')
+            }
+        } catch (error) {
+            console.error('Save encrypt settings error:', error)
+            setEncryptError('保存失败，请稍后重试')
+        } finally {
+            setEncryptSaving(false)
+        }
+    }
 
     return (
         <IconContext.Provider value={{ className: 'popup-icon' }}>
@@ -154,6 +226,61 @@ const Popup: React.FC = () => {
                         {actionLoading === 'removeAll' && <span className="popup-action-badge">…</span>}
                     </button>
                 </section>
+
+                <section className="popup-encrypt-hint">
+                    <button
+                        type="button"
+                        className="popup-encrypt-button"
+                        onClick={openEncryptModal}
+                    >
+                        {encryptEnabled ? '已启用加密 · 修改密码' : '设置加密密码'}
+                    </button>
+                </section>
+
+                {showEncryptModal && (
+                    <div className="popup-modal-backdrop">
+                        <div className="popup-modal">
+                            <h2 className="popup-modal-title">加密设置</h2>
+                            <label className="popup-modal-row">
+                                <input
+                                    type="checkbox"
+                                    checked={encryptEnabled}
+                                    onChange={e => setEncryptEnabled(e.target.checked)}
+                                />
+                                <span>启用加密存储远程书签</span>
+                            </label>
+                            <div className="popup-modal-row">
+                                <input
+                                    type="password"
+                                    className="popup-modal-input"
+                                    value={encryptPassword}
+                                    onChange={e => setEncryptPassword(e.target.value)}
+                                    placeholder="请输入加密密码"
+                                    disabled={!encryptEnabled}
+                                />
+                            </div>
+                            {encryptError && <p className="popup-modal-error">{encryptError}</p>}
+                            <div className="popup-modal-actions">
+                                <button
+                                    type="button"
+                                    className="popup-modal-btn secondary"
+                                    onClick={() => setShowEncryptModal(false)}
+                                    disabled={encryptSaving}
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="button"
+                                    className="popup-modal-btn primary"
+                                    onClick={handleSaveEncryptSettings}
+                                    disabled={encryptSaving}
+                                >
+                                    {encryptSaving ? '保存中…' : '保存'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <footer className="popup-footer">
                     {statusMessage && (
