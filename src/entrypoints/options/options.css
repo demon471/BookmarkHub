@@ -314,6 +314,184 @@ html, body {
   background: var(--surface);
 }
 
+/* --- Toggle switch: modern pill style inside options form --- */
+.options-form .form-switch .form-check-input {
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background-color: rgba(148, 163, 184, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.4);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  position: relative;
+  background-image: none !important;
+  transition: background-color 0.18s ease, border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.options-form .form-switch .form-check-input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.45);
+  transition: transform 0.18s ease;
+}
+
+.options-form .form-switch .form-check-input:checked {
+  background-color: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.75);
+}
+
+.options-form .form-switch .form-check-input:checked::before {
+  transform: translateX(14px);
+}
+
+.options-form .form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.45);
+}
+
+.options-form .form-switch .form-check-input:disabled {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* --- Selector: pill-shaped dropdown for sync interval, etc. --- */
+.options-form select.form-control,
+.options-form .form-select {
+  border-radius: 999px;
+  padding-right: 28px;
+  padding-left: 12px;
+  min-height: 32px;
+  font-size: 13px;
+  background-color: var(--surface-alt);
+  border-color: rgba(148, 163, 184, 0.6);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: none;
+}
+
+.options-form select.form-control:focus,
+.options-form .form-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  background-color: var(--surface);
+}
+
+/* Option rows inside dropdown (best-effort, browser-limited) */
+.options-form .form-select option {
+  background-color: #020617;
+  color: var(--text-primary);
+}
+
+.options-form .form-select option:checked {
+  background-color: #1d4ed8;
+  color: #f9fafb;
+}
+
+/* Custom dropdown for autoSyncInterval */
+.options-select-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+  outline: none;
+}
+
+.options-select-custom:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.options-select-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 10px 4px 12px;
+  font-size: 13px;
+}
+
+.options-select-value {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.options-select-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.options-select-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+
+.options-select-arrow--open {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.options-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: #020617;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.65);
+  padding: 4px;
+}
+
+.options-select-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 10px;
+  text-align: left;
+  font-size: 13px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  transition: background-color 0.14s ease, color 0.14s ease, transform 0.08s ease;
+}
+
+.options-select-option:hover {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.options-select-option--active {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  color: #f9fafb;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.7);
+}
+
 .options-form-actions {
   display: flex;
   flex-direction: column;

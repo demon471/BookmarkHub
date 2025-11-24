@@ -42,6 +42,18 @@ const Popup: React.FC = () => {
 
     const encryptEnabled = !!watch('enableEncrypt');
 
+    const autoSyncIntervalValue = watch('autoSyncInterval') ?? 15;
+    const autoSyncOptions = useMemo(
+        () => [
+            { value: 5, label: browser.i18n.getMessage('autoSyncInterval5') },
+            { value: 15, label: browser.i18n.getMessage('autoSyncInterval15') },
+            { value: 30, label: browser.i18n.getMessage('autoSyncInterval30') },
+            { value: 60, label: browser.i18n.getMessage('autoSyncInterval60') },
+        ],
+        []
+    );
+    const [autoSyncDropdownOpen, setAutoSyncDropdownOpen] = useState(false);
+
     const buildFolderMeta = (nodes: any[] | null) => {
         const counts: { [id: string]: number } = {};
         const ids: string[] = [];
@@ -704,12 +716,56 @@ const Popup: React.FC = () => {
                                         <Form.Group as={Row} className="options-form-group">
                                             <Form.Label column="sm" sm={3} lg={2} xs={3}>{browser.i18n.getMessage('autoSyncInterval')}</Form.Label>
                                             <Col sm={9} lg={10} xs={9}>
+                                                <div
+                                                    className="options-select-custom"
+                                                    tabIndex={0}
+                                                    onClick={() => setAutoSyncDropdownOpen(prev => !prev)}
+                                                    onBlur={() => setAutoSyncDropdownOpen(false)}
+                                                >
+                                                    <div className="options-select-display">
+                                                        <span className="options-select-value">
+                                                            {(
+                                                                autoSyncOptions.find(opt => String(opt.value) === String(autoSyncIntervalValue)) ||
+                                                                autoSyncOptions[1]
+                                                            ).label}
+                                                        </span>
+                                                        <span
+                                                            className={`options-select-arrow ${autoSyncDropdownOpen ? 'options-select-arrow--open' : ''}`}
+                                                            aria-hidden="true"
+                                                        >
+                                                            <svg viewBox="0 0 16 16" role="presentation" focusable="false">
+                                                                <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                            </svg>
+                                                        </span>
+                                                    </div>
+                                                    {autoSyncDropdownOpen && (
+                                                        <div className="options-select-dropdown">
+                                                            {autoSyncOptions.map(opt => {
+                                                                const isActive = String(opt.value) === String(autoSyncIntervalValue ?? '');
+                                                                return (
+                                                                    <button
+                                                                        key={opt.value}
+                                                                        type="button"
+                                                                        className={`options-select-option ${isActive ? 'options-select-option--active' : ''}`}
+                                                                        onMouseDown={e => e.preventDefault()}
+                                                                        onClick={() => {
+                                                                            setValue('autoSyncInterval', String(opt.value));
+                                                                            setAutoSyncDropdownOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <Form.Control
                                                     as="select"
                                                     name="autoSyncInterval"
                                                     ref={register}
-                                                    size="sm"
                                                     defaultValue="15"
+                                                    style={{ display: 'none' }}
                                                 >
                                                     <option value="5">{browser.i18n.getMessage('autoSyncInterval5')}</option>
                                                     <option value="15">{browser.i18n.getMessage('autoSyncInterval15')}</option>
