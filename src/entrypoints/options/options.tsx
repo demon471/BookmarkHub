@@ -11,7 +11,8 @@ import optionsStorage from '../../utils/optionsStorage'
 
 const Popup: React.FC = () => {
 
-    const { register, setValue, handleSubmit, watch } = useForm();
+    const { register, setValue, handleSubmit, watch, reset } = useForm();
+
     const [saving, setSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
     const [importMessage, setImportMessage] = useState('');
@@ -72,14 +73,16 @@ const Popup: React.FC = () => {
     const loadConfig = async () => {
         // 加载现有配置
         const options = await optionsStorage.getAll();
-        setValue('githubToken', options.githubToken || '');
-        setValue('gistID', options.gistID || '');
-        setValue('gistFileName', options.gistFileName || 'BookmarkHub');
-        setValue('enableNotify', options.enableNotify !== false);
-        setValue('autoSyncEnabled', options.autoSyncEnabled || false);
-        setValue('autoSyncInterval', options.autoSyncInterval || 15);
-        setValue('enableEncrypt', options.enableEncrypt || false);
-        setValue('encryptPassword', options.encryptPassword || '');
+        reset({
+            githubToken: options.githubToken || '',
+            gistID: options.gistID || '',
+            gistFileName: options.gistFileName || 'BookmarkHub',
+            enableNotify: options.enableNotify !== false,
+            autoSyncEnabled: options.autoSyncEnabled || false,
+            autoSyncInterval: options.autoSyncInterval || 15,
+            enableEncrypt: options.enableEncrypt || false,
+            encryptPassword: options.encryptPassword || '',
+        });
     };
 
     const loadFolderTree = async () => {

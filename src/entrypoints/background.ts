@@ -3,6 +3,8 @@ import { Setting } from '../utils/setting'
 import iconLogo from '../assets/icon.png'
 import { OperType, BookmarkInfo, SyncDataInfo, RootBookmarksType, BrowserType } from '../utils/models'
 import { Bookmarks } from 'wxt/browser'
+import { encryptStringWithPassword, decryptStringWithPassword, isAesEncryptedPayload } from '../utils/encryption'
+
 export default defineBackground(() => {
 
   browser.runtime.onInstalled.addListener(async (c) => {
@@ -65,6 +67,7 @@ export default defineBackground(() => {
       (async () => {
         try {
           let bookmarks = await getBookmarks();
+
           const selectedFolderIds = Array.isArray(msg.selectedFolderIds) ? (msg.selectedFolderIds as string[]) : undefined;
           if (selectedFolderIds && selectedFolderIds.length) {
             bookmarks = filterBookmarksBySelectedFolders(bookmarks, selectedFolderIds);
@@ -207,6 +210,7 @@ export default defineBackground(() => {
     }
     return true;
   });
+
   browser.bookmarks.onCreated.addListener(async (id, info) => {
     console.log('📌 Bookmark created:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
@@ -268,6 +272,7 @@ export default defineBackground(() => {
 
   // Listen for configuration changes to trigger initial sync 和自动同步定时器更新
   browser.storage.onChanged.addListener(async (changes, areaName) => {
+
     if (areaName === 'sync' && (changes.githubToken || changes.gistID)) {
       console.log('📝 GitHub configuration changed, checking...');
       if (configChangeTimer) clearTimeout(configChangeTimer);
@@ -305,6 +310,7 @@ export default defineBackground(() => {
   });
 
   async function showSyncBadge(status: 'syncing' | 'success' | 'error') {
+
     if (badgeTimeoutId) {
       clearTimeout(badgeTimeoutId);
       badgeTimeoutId = null;
@@ -321,6 +327,45 @@ export default defineBackground(() => {
       badgeTimeoutId = setTimeout(async () => {
         await browser.action.setBadgeText({ text: '' });
       }, 5000);
+    }
+  }
+
+  async function encodeSyncDataForUpload(syncdata: SyncDataInfo, setting: Setting): Promise<string> {
+    const json = JSON.stringify(syncdata);
+    if (setting.enableEncrypt && setting.encryptPassword) {
+      try {
+        const encrypted = await encryptStringWithPassword(json, setting.encryptPassword);
+        return JSON.stringify(encrypted);
+      } catch (error) {
+        console.error('Failed to encrypt sync data, fallback to plain text upload:', error);
+        return json;
+      }
+    }
+    return json;
+  }
+
+  async function decodeRemoteSyncData(raw: string, setting: Setting): Promise<SyncDataInfo | null> {
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const parsed: any = JSON.parse(raw);
+
+      if (isAesEncryptedPayload(parsed)) {
+        if (!setting.enableEncrypt || !setting.encryptPassword) {
+          console.error('Remote data is encrypted but encryption is disabled or password is empty');
+          throw new Error('远程数据已加密，请在设置中启用加密并填写正确的加密密码后重试。');
+        }
+
+        const decryptedText = await decryptStringWithPassword(parsed, setting.encryptPassword);
+        return JSON.parse(decryptedText) as SyncDataInfo;
+      }
+
+      return parsed as SyncDataInfo;
+    } catch (error) {
+      console.error('Failed to decode remote sync data:', error);
+      throw error;
     }
   }
 
@@ -412,7 +457,7 @@ export default defineBackground(() => {
       console.log('📤 Starting upload bookmarks...');
       await showSyncBadge('syncing');
 
-      let setting = await Setting.build()
+      let setting = await Setting.build();
       console.log('📋 Settings loaded:', {
         hasToken: !!setting.githubToken,
         tokenLength: setting.githubToken?.length || 0,
@@ -425,17 +470,17 @@ export default defineBackground(() => {
 
       if (setting.githubToken == '') {
         console.error('❌ Configuration error: Gist Token Not Found');
-        throw new Error("Gist Token Not Found");
+        throw new Error('Gist Token Not Found');
       }
       if (setting.gistID == '') {
         console.error('❌ Configuration error: Gist ID Not Found');
-        throw new Error("Gist ID Not Found");
+        throw new Error('Gist ID Not Found');
       }
       if (setting.gistFileName == '') {
         console.error('❌ Configuration error: Gist File Not Found');
-        throw new Error("Gist File Not Found");
+        throw new Error('Gist File Not Found');
       }
-      
+
       console.log('✅ Configuration validated');
 
       let bookmarks = await getBookmarks();
@@ -468,56 +513,57 @@ export default defineBackground(() => {
         dataSize: JSON.stringify(syncdata).length
       });
 
+      const fileContent = await encodeSyncDataForUpload(syncdata, setting);
+
       const updateData = {
         files: {
           [setting.gistFileName]: {
-            content: JSON.stringify(syncdata)
+            content: fileContent
           }
         },
         description: setting.gistFileName
       };
-      
+
       console.log('🌐 Sending update request to GitHub API...');
       console.log('   - Target Gist:', setting.gistID);
       console.log('   - File:', setting.gistFileName);
       console.log('   - Data size:', JSON.stringify(updateData).length, 'bytes');
       const result = await BookmarkService.update(updateData);
       console.log('✅ GitHub API response received:', result ? 'Success' : 'No response');
-      
+
       const count = getBookmarkCount(syncdata.bookmarks);
       await browser.storage.local.set({ remoteCount: count });
       console.log('Remote count updated:', count);
-      
+
       // Update last sync time after successful upload
       await updateLastSyncTime();
       console.log('Last sync time updated');
-      
+
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
       console.log('Bookmark structure tracking updated');
-      
+
       if (setting.enableNotify) {
         await browser.notifications.create({
-          type: "basic",
+          type: 'basic',
           iconUrl: iconLogo,
           title: browser.i18n.getMessage('uploadBookmarks'),
           message: browser.i18n.getMessage('success')
         });
       }
-      
+
       console.log('Upload bookmarks completed successfully');
       await showSyncBadge('success');
       // Refresh local count for popup display
       await refreshLocalCount();
 
-    }
-    catch (error: any) {
+    } catch (error: any) {
       console.error('❌ Upload bookmarks error:', error);
       console.error('   Error type:', error.constructor.name);
       console.error('   Error message:', error.message);
       console.error('   Error stack:', error.stack);
       await showSyncBadge('error');
-      
+
       // 只在配置问题时显示一次提示
       const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
       if (isConfigError) {
@@ -527,7 +573,7 @@ export default defineBackground(() => {
         if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
           await browser.storage.local.set({ lastConfigErrorNotified: now });
           await browser.notifications.create({
-            type: "basic",
+            type: 'basic',
             iconUrl: iconLogo,
             title: browser.i18n.getMessage('uploadBookmarks'),
             message: `${browser.i18n.getMessage('error')}：${error.message}`
@@ -538,7 +584,7 @@ export default defineBackground(() => {
       } else {
         // 非配置错误，正常提示
         await browser.notifications.create({
-          type: "basic",
+          type: 'basic',
           iconUrl: iconLogo,
           title: browser.i18n.getMessage('uploadBookmarks'),
           message: `${browser.i18n.getMessage('error')}：${error.message}`
@@ -546,19 +592,20 @@ export default defineBackground(() => {
       }
     }
   }
+
   async function downloadBookmarks(options?: { mergeLocal?: boolean }) {
     try {
       console.log('Starting download bookmarks...');
       await showSyncBadge('syncing');
-      
-      let gist = await BookmarkService.get();
-      let setting = await Setting.build()
+
+      const gist = await BookmarkService.get();
+      const setting = await Setting.build();
       if (gist) {
-        let syncdata: SyncDataInfo = JSON.parse(gist);
-        if (syncdata.bookmarks == undefined || syncdata.bookmarks.length == 0) {
+        const syncdata = await decodeRemoteSyncData(gist, setting);
+        if (!syncdata || syncdata.bookmarks == undefined || syncdata.bookmarks.length == 0) {
           if (setting.enableNotify) {
             await browser.notifications.create({
-              type: "basic",
+              type: 'basic',
               iconUrl: iconLogo,
               title: browser.i18n.getMessage('downloadBookmarks'),
               message: `${browser.i18n.getMessage('error')}：Gist File ${setting.gistFileName} is NULL`
@@ -598,7 +645,7 @@ export default defineBackground(() => {
             isClearing = false;
           }
         }
-        
+
         const count = getBookmarkCount(syncdata.bookmarks);
         await browser.storage.local.set({ remoteCount: count });
         // Update last sync time after successful download
@@ -608,7 +655,7 @@ export default defineBackground(() => {
         console.log('Bookmark structure tracking updated after download');
         if (setting.enableNotify) {
           await browser.notifications.create({
-            type: "basic",
+            type: 'basic',
             iconUrl: iconLogo,
             title: browser.i18n.getMessage('downloadBookmarks'),
             message: browser.i18n.getMessage('success')
@@ -618,18 +665,16 @@ export default defineBackground(() => {
         // Refresh local count for popup display
         await refreshLocalCount();
 
-      }
-      else {
+      } else {
         await browser.notifications.create({
-          type: "basic",
+          type: 'basic',
           iconUrl: iconLogo,
           title: browser.i18n.getMessage('downloadBookmarks'),
           message: `${browser.i18n.getMessage('error')}：Gist File ${setting.gistFileName} Not Found`
         });
         await showSyncBadge('error');
       }
-    }
-    catch (error: any) {
+    } catch (error: any) {
       console.error(error);
       isClearing = false; // 确保错误时也清除标志
       // 只在配置问题时显示一次提示
@@ -641,7 +686,7 @@ export default defineBackground(() => {
         if (!lastConfigErrorNotified || now - lastConfigErrorNotified > 3600000) {
           await browser.storage.local.set({ lastConfigErrorNotified: now });
           await browser.notifications.create({
-            type: "basic",
+            type: 'basic',
             iconUrl: iconLogo,
             title: browser.i18n.getMessage('downloadBookmarks'),
             message: `${browser.i18n.getMessage('error')}：${error.message}`
@@ -652,7 +697,7 @@ export default defineBackground(() => {
       } else {
         // 非配置错误，正常提示
         await browser.notifications.create({
-          type: "basic",
+          type: 'basic',
           iconUrl: iconLogo,
           title: browser.i18n.getMessage('downloadBookmarks'),
           message: `${browser.i18n.getMessage('error')}：${error.message}`
@@ -664,42 +709,42 @@ export default defineBackground(() => {
   async function pullLatestOnStartup(): Promise<void> {
     try {
       console.log('🔄 Checking for remote updates on startup...');
-      
+
       // 检查配置是否完整
       const setting = await Setting.build();
       if (!setting.githubToken || !setting.gistID) {
         console.log('⏸️ Startup pull skipped: GitHub not configured');
         return;
       }
-      
+
       // 检查初始同步是否完成
       const { initialSyncCompleted } = await browser.storage.local.get(['initialSyncCompleted']);
       if (!initialSyncCompleted) {
         console.log('⏸️ Startup pull skipped: Waiting for initial sync to complete');
         return;
       }
-      
+
       // 获取远程数据
       const gist = await BookmarkService.get();
       if (!gist) {
         console.log('⏸️ Startup pull skipped: No remote data found');
         return;
       }
-      
-      const remoteSyncData: SyncDataInfo = JSON.parse(gist);
-      if (!remoteSyncData.bookmarks || remoteSyncData.bookmarks.length === 0) {
+
+      const remoteSyncData = await decodeRemoteSyncData(gist, setting);
+      if (!remoteSyncData || !remoteSyncData.bookmarks || remoteSyncData.bookmarks.length === 0) {
         console.log('⏸️ Startup pull skipped: Remote data is empty');
         return;
       }
-      
+
       // 获取本地书签
       const localBookmarks = await getBookmarks();
       const localStructure = JSON.stringify(formatBookmarks(localBookmarks));
       const remoteStructure = JSON.stringify(remoteSyncData.bookmarks);
-      
+
       const localCount = getBookmarkCount(localBookmarks);
       const remoteCount = getBookmarkCount(remoteSyncData.bookmarks);
-      
+
       console.log('📊 Startup comparison:', {
         localCount,
         remoteCount,
@@ -707,7 +752,7 @@ export default defineBackground(() => {
         remoteSize: remoteStructure.length,
         identical: localStructure === remoteStructure
       });
-      
+
       // 比较本地和远程是否一致
       if (localStructure === remoteStructure) {
         console.log('✅ Local and remote are identical, skipping pull');
@@ -715,23 +760,23 @@ export default defineBackground(() => {
         await browser.storage.local.set({ lastSyncTime: remoteSyncData.createDate });
         return;
       }
-      
+
       // 检查本地是否有未同步的修改
       const { lastBookmarkStructure } = await browser.storage.local.get(['lastBookmarkStructure']);
       const localHasChanges = lastBookmarkStructure && lastBookmarkStructure !== localStructure;
-      
+
       if (localHasChanges) {
         console.log('⚠️ Startup pull skipped: Local has unsaved changes');
         console.log('   💡 Local changes will be uploaded by auto-sync');
         return;
       }
-      
+
       // 远程和本地不同，且本地无未同步修改 -> 下载
       console.log('🔽 Pulling latest version from remote...');
       console.log(`   📥 Downloading ${remoteCount} bookmarks from remote`);
-      
+
       await showSyncBadge('syncing');
-      
+
       // 执行下载
       isClearing = true;
       try {
@@ -740,34 +785,34 @@ export default defineBackground(() => {
       } finally {
         isClearing = false;
       }
-      
+
       // 更新存储
-      await browser.storage.local.set({ 
+      await browser.storage.local.set({
         remoteCount: remoteCount,
         lastSyncTime: remoteSyncData.createDate
       });
-      
+
       // 更新书签结构追踪
       await updateBookmarkStructureTracking();
-      
+
       console.log('✅ Startup pull completed:', {
         bookmarksDownloaded: remoteCount,
         remoteTime: new Date(remoteSyncData.createDate).toLocaleString()
       });
-      
+
       // 显示通知
       if (setting.enableNotify) {
         await browser.notifications.create({
-          type: "basic",
+          type: 'basic',
           iconUrl: iconLogo,
           title: '启动同步',
           message: `已从远程拉取最新书签（${remoteCount}个）`
         });
       }
-      
+
       await showSyncBadge('success');
       await refreshLocalCount();
-      
+
     } catch (error: any) {
       console.error('❌ Startup pull error:', error);
       isClearing = false; // 确保错误时也清除标志
@@ -779,12 +824,12 @@ export default defineBackground(() => {
   // Initialize on startup
   browser.runtime.onStartup.addListener(async () => {
     console.log('🔧 Extension startup');
-    
+
     // 延迟1秒后执行拉取，避免启动时资源竞争
     setTimeout(async () => {
       await pullLatestOnStartup();
     }, 1000);
-    
+
     // Refresh local count on startup
     await refreshLocalCount();
     console.log('✅ Extension ready to sync on bookmark changes');
