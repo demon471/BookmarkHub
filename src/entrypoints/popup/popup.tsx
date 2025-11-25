@@ -21,6 +21,21 @@ const Popup: React.FC = () => {
     const [encryptSaving, setEncryptSaving] = useState(false)
     const [encryptError, setEncryptError] = useState('')
     const [pendingRetryAction, setPendingRetryAction] = useState<ActionName | null>(null)
+    const [showClearModal, setShowClearModal] = useState(false)
+    const [clearSaving, setClearSaving] = useState(false)
+
+    const renderPopupToast = (message: string, key: string) => {
+        const isSuccess = message.startsWith('✅');
+        const cleanMessage = message.replace(/^✅\s*/, '').replace(/^❌\s*/, '');
+        return (
+            <div key={key} className={`popup-toast ${isSuccess ? 'popup-toast--success' : 'popup-toast--error'}`}>
+                <div className="popup-toast-icon">
+                    {isSuccess ? '✓' : '!'}
+                </div>
+                <div className="popup-toast-message">{cleanMessage}</div>
+            </div>
+        );
+    };
 
     const refreshCounts = async () => {
         const data = await browser.storage.local.get(["localCount", "remoteCount"]);
@@ -78,12 +93,10 @@ const Popup: React.FC = () => {
         }
     }, [])
 
-    const runAction = async (name: ActionName) => {
-        if (name === 'removeAll') {
-            const confirmed = window.confirm('确认清空本地书签并重置同步状态？此操作不可撤销。');
-            if (!confirmed) {
-                return;
-            }
+    const runAction = async (name: ActionName, options?: { skipConfirm?: boolean }) => {
+        if (name === 'removeAll' && !options?.skipConfirm) {
+            setShowClearModal(true);
+            return;
         }
 
         setActionLoading(name);
@@ -151,6 +164,16 @@ const Popup: React.FC = () => {
         }
     }
 
+    const handleConfirmRemoveAll = async () => {
+        setClearSaving(true)
+        try {
+            await runAction('removeAll', { skipConfirm: true })
+            setShowClearModal(false)
+        } finally {
+            setClearSaving(false)
+        }
+    }
+
     return (
         <IconContext.Provider value={{ className: 'popup-icon' }}>
             <div className="popup-root">
@@ -193,7 +216,6 @@ const Popup: React.FC = () => {
                                 <span>{browser.i18n.getMessage('uploadBookmarksDesc')}</span>
                             </div>
                         </div>
-                        {actionLoading === 'upload' && <span className="popup-action-badge">…</span>}
                     </button>
 
                     <button
@@ -208,7 +230,6 @@ const Popup: React.FC = () => {
                                 <span>{browser.i18n.getMessage('downloadBookmarksDesc')}</span>
                             </div>
                         </div>
-                        {actionLoading === 'download' && <span className="popup-action-badge">…</span>}
                     </button>
 
                     <button
@@ -223,7 +244,6 @@ const Popup: React.FC = () => {
                                 <span>{browser.i18n.getMessage('removeAllBookmarksDesc')}</span>
                             </div>
                         </div>
-                        {actionLoading === 'removeAll' && <span className="popup-action-badge">…</span>}
                     </button>
                 </section>
 
@@ -282,9 +302,40 @@ const Popup: React.FC = () => {
                     </div>
                 )}
 
+                {showClearModal && (
+                    <div className="popup-modal-backdrop">
+                        <div className="popup-modal">
+                            <h2 className="popup-modal-title">清空本地书签</h2>
+                            <p className="popup-modal-row">
+                                清空后将删除当前浏览器中的全部书签并重置同步状态，此操作不可撤销，请先备份重要书签。
+                            </p>
+                            <div className="popup-modal-actions">
+                                <button
+                                    type="button"
+                                    className="popup-modal-btn popup-modal-btn-cancel"
+                                    onClick={() => setShowClearModal(false)}
+                                    disabled={clearSaving}
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="button"
+                                    className="popup-modal-btn popup-modal-btn-danger"
+                                    onClick={handleConfirmRemoveAll}
+                                    disabled={clearSaving}
+                                >
+                                    {clearSaving ? '清空中…' : '确认清空'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <footer className="popup-footer">
                     {statusMessage && (
-                        <p className={statusMessage.startsWith('✅') ? 'popup-feedback success' : 'popup-feedback error'}>{statusMessage}</p>
+                        <div className="popup-toast-container">
+                            {renderPopupToast(statusMessage, 'popup')}
+                        </div>
                     )}
                     <p className="popup-tip">最新的同步范围可在「设置页」中调整。</p>
                 </footer>
