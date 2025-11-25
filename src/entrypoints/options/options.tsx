@@ -32,20 +32,21 @@ const Popup: React.FC = () => {
     const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
 
     const folderSelectionStats = useMemo(() => {
-        const totalFolders = allFolderIds.length;
-        const selectedFolders = selectedFolderIds.length;
-        const excludedFolders = Math.max(totalFolders - selectedFolders, 0);
-
+        let totalBookmarks = 0;
+        let selectedBookmarks = 0;
+        let excludedBookmarks = 0;
         let coverage = 0;
 
         if (folderTree && folderTree.length > 0) {
             const rootNode = folderTree[0];
             const rootId = rootNode.id;
-            const totalBookmarks = folderBookmarkCount[rootId] ?? 0;
+            totalBookmarks = folderBookmarkCount[rootId] ?? 0;
 
             if (totalBookmarks > 0) {
+                // 先按文件夹选中情况推导出被排除的文件夹列表
                 const excludedFolderIds = allFolderIds.filter(id => !selectedFolderIds.includes(id));
 
+                // parentMap 用于判断一个排除节点是否是“排除分支”的根
                 const parentMap: { [id: string]: string | null } = {};
                 const stack: any[] = [...folderTree];
                 while (stack.length) {
@@ -71,20 +72,20 @@ const Popup: React.FC = () => {
                     }
                 }
 
-                const excludedBookmarks = Array.from(excludedRoots).reduce((sum, id) => {
+                excludedBookmarks = Array.from(excludedRoots).reduce((sum, id) => {
                     const count = folderBookmarkCount[id] ?? 0;
                     return sum + count;
                 }, 0);
 
-                const coveredBookmarks = Math.max(totalBookmarks - excludedBookmarks, 0);
-                coverage = Math.round((coveredBookmarks / totalBookmarks) * 100);
+                selectedBookmarks = Math.max(totalBookmarks - excludedBookmarks, 0);
+                coverage = Math.round((selectedBookmarks / totalBookmarks) * 100);
             }
         }
 
         return {
-            total: totalFolders,
-            selected: selectedFolders,
-            excluded: excludedFolders,
+            total: totalBookmarks,
+            selected: selectedBookmarks,
+            excluded: excludedBookmarks,
             coverage,
         };
     }, [selectedFolderIds, allFolderIds, folderTree, folderBookmarkCount]);
@@ -433,6 +434,7 @@ const Popup: React.FC = () => {
 
             if (result) {
                 await persistSelectedFolders();
+                await loadFolderTree();
                 showBookmarkActionMessage('✅ 已保存同步范围并触发上传');
             } else {
                 showBookmarkActionMessage('❌ 保存选择或上传失败，请稍后重试');
@@ -485,6 +487,7 @@ const Popup: React.FC = () => {
 
             if (result && result.ok) {
                 showBookmarkActionMessage('✅ 已从文件导入书签');
+                await loadFolderTree();
             } else {
                 throw new Error(result?.error || 'Import failed');
             }
@@ -669,11 +672,14 @@ const Popup: React.FC = () => {
                 </div>
                 <div className="options-page-meta">
                     <div className="options-meta-item">
-                        <span>已选文件夹</span>
-                        <strong>{folderSelectionStats.selected}</strong>
+                        <span>已选书签</span>
+                        <strong>
+                            <span style={{ color: '#4ade80' }}>{folderSelectionStats.selected}</span>
+                            <span style={{ color: '#9ca3af' }}>/ {folderSelectionStats.total}</span>
+                        </strong>
                     </div>
                     <div className="options-meta-item">
-                        <span>已排除</span>
+                        <span>已排除书签</span>
                         <strong>{folderSelectionStats.excluded}</strong>
                     </div>
                     <div className="options-meta-item">
@@ -1080,7 +1086,7 @@ const Popup: React.FC = () => {
                                 {!treeError && !folderTree && loadingTree && (
                                     <div className="folder-tree-empty">正在加载书签...</div>
                                 )}
-                                {!treeError && folderTree && !loadingTree && (
+                                {!treeError && folderTree && (
                                     renderFolderNodes(folderTree) || <div className="folder-tree-empty">没有找到任何书签文件夹。</div>
                                 )}
                             </div>
