@@ -126,19 +126,20 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  margin: 16px 0;
+  margin: 18px 0 20px;
 }
 
 .popup-stat {
   background: var(--surface);
   border-radius: 12px;
-  padding: 10px 12px;
-  box-shadow: var(--shadow-medium);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-soft);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   text-align: center;
+  min-height: 64px;
 }
 
 .popup-stat span {
@@ -147,8 +148,25 @@ body {
 }
 
 .popup-stat strong {
-  font-size: 16px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-primary);
+}
+
+.popup-stat-local {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: radial-gradient(circle at top, rgba(16, 185, 129, 0.16), transparent 55%);
+}
+
+.popup-stat-remote {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: radial-gradient(circle at top, rgba(37, 99, 235, 0.16), transparent 55%);
+}
+
+.popup-stat-excluded {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: radial-gradient(circle at top, rgba(239, 68, 68, 0.16), transparent 55%);
 }
 
 .popup-actions {
@@ -306,8 +324,8 @@ body {
 }
 
 .popup-encrypt-hint {
-  margin-top: 8px;
-  text-align: right;
+  margin-top: 10px;
+  text-align: left;
 }
 
 .popup-encrypt-button {
@@ -321,6 +339,33 @@ body {
 
 .popup-encrypt-button:hover {
   text-decoration: underline;
+}
+
+.popup-encrypt-button--enabled {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.8);
+  color: #4ade80;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.popup-encrypt-button--enabled:hover {
+  background: rgba(22, 163, 74, 0.22);
+}
+
+.popup-encrypt-button--disabled {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(148, 163, 184, 0.9);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.popup-encrypt-button--disabled:hover {
+  border-style: solid;
+  color: var(--accent);
 }
 
 .popup-modal-backdrop {

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { IconContext } from 'react-icons'
 import {
     AiOutlineCloudUpload, AiOutlineCloudDownload,
-    AiOutlineSetting, AiOutlineClear
+    AiOutlineSetting, AiOutlineClear,
 } from 'react-icons/ai'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './popup.css'
@@ -188,16 +188,29 @@ const Popup: React.FC = () => {
                     </button>
                 </header>
 
+                <section className="popup-encrypt-hint">
+                    <button
+                        type="button"
+                        className={
+                            `popup-encrypt-button ` +
+                            (encryptEnabled ? 'popup-encrypt-button--enabled' : 'popup-encrypt-button--disabled')
+                        }
+                        onClick={openEncryptModal}
+                    >
+                        {encryptEnabled ? '已启用加密 · 修改密码' : '未启用加密 · 点击设置'}
+                    </button>
+                </section>
+
                 <section className="popup-stats">
-                    <div className="popup-stat">
+                    <div className="popup-stat popup-stat-local">
                         <span>本地</span>
                         <strong>{count["local"]}</strong>
                     </div>
-                    <div className="popup-stat">
+                    <div className="popup-stat popup-stat-remote">
                         <span>远程</span>
                         <strong>{count["remote"]}</strong>
                     </div>
-                    <div className="popup-stat">
+                    <div className="popup-stat popup-stat-excluded">
                         <span>排除</span>
                         <strong>{count["excluded"]}</strong>
                     </div>
@@ -244,16 +257,6 @@ const Popup: React.FC = () => {
                                 <span>{browser.i18n.getMessage('removeAllBookmarksDesc')}</span>
                             </div>
                         </div>
-                    </button>
-                </section>
-
-                <section className="popup-encrypt-hint">
-                    <button
-                        type="button"
-                        className="popup-encrypt-button"
-                        onClick={openEncryptModal}
-                    >
-                        {encryptEnabled ? '已启用加密 · 修改密码' : '设置加密密码'}
                     </button>
                 </section>
 

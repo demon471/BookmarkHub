@@ -235,32 +235,6 @@ const Popup: React.FC = () => {
                 hasGistID: !!data.gistID,
                 fileName: data.gistFileName
             });
-
-            setSaveMessage('✅ 配置已保存！正在检查初始同步...');
-
-            // 等待一下让storage.onChanged触发
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // 检查初始同步状态
-            const { initialSyncCompleted, pendingInitialSync } = await browser.storage.local.get(['initialSyncCompleted', 'pendingInitialSync']);
-
-            console.log('Initial sync status:', {
-                initialSyncCompleted,
-                pendingInitialSync
-            });
-
-            if (!initialSyncCompleted && !pendingInitialSync) {
-                // 如果初始同步没有完成且没有pending，手动触发
-                console.log('⚠️ Initial sync not triggered automatically, triggering manually...');
-
-                // 发送消息到background让它执行初始同步
-                try {
-                    await browser.runtime.sendMessage({ name: 'triggerInitialSync' });
-                } catch (err) {
-                    console.error('Failed to trigger initial sync:', err);
-                }
-            }
-
             setSaveMessage('✅ 配置已保存！');
             setTimeout(() => setSaveMessage(''), 3000);
         } catch (error) {
