@@ -951,6 +951,7 @@ export default defineBackground(() => {
   async function clearBookmarkTree() {
     try {
       const setting = await Setting.build();
+
       if (!setting.githubToken) {
         throw new Error('Gist Token Not Found');
       }
@@ -973,57 +974,132 @@ export default defineBackground(() => {
         }
       }
 
-      // 按“同步范围”清空：
-      // 1）如果有 selectedFolderIds，则先通过 filterBookmarksBySelectedFolders 计算出只包含同步范围的子树，
-      //    然后仅删除该子树中每个根容器（书签栏/菜单等）下面的子节点，避免删除系统根容器本身；
-      // 2）如果没有任何同步配置，则退回到旧行为：清空所有用户书签（根容器下的子节点）。
-
-      const stored = await browser.storage.local.get(['selectedFolderIds']);
-      const selectedIds = Array.isArray(stored.selectedFolderIds)
+      // 读取当前的同步范围配置
+      const stored = await browser.storage.local.get([
+        'selectedFolderIds',
+        'excludedFolderIds',
+      ]);
+      const selectedIdsRaw = Array.isArray(stored.selectedFolderIds)
         ? (stored.selectedFolderIds as string[])
         : [];
-      const hasSelection = selectedIds.length > 0;
+      const excludedIdsRaw = Array.isArray(stored.excludedFolderIds)
+        ? (stored.excludedFolderIds as string[])
+        : [];
+
+      // 由于下载/清空会导致书签节点 id 变化，这里根据“当前书签树”过滤一遍，
+      // 只保留仍然存在的 id，避免使用失效 id 干扰清除逻辑。
+      // 同时记录 parentMap，后续删除时可以跳过“祖先也在删除集合中的子节点”，防止重复 removeTree。
+      const existingFolderIds = new Set<string>();
+      const parentMap = new Map<string, string | null>();
+      const stack: BookmarkInfo[] = [];
+      if (rootNode) {
+        stack.push(rootNode);
+      }
+      while (stack.length) {
+        const node = stack.pop()!;
+        if (node.id && node.children && node.children.length) {
+          existingFolderIds.add(node.id);
+        }
+        if (node.id) {
+          const parentId = (node as any).parentId as string | undefined;
+          if (parentId) {
+            parentMap.set(node.id, parentId);
+          } else if (!parentMap.has(node.id)) {
+            parentMap.set(node.id, null);
+          }
+        }
+        if (node.children) {
+          for (const child of node.children) {
+            stack.push(child as BookmarkInfo);
+          }
+        }
+      }
+
+      const selectedIds = selectedIdsRaw.filter(id => existingFolderIds.has(id));
+      const excludedIds = excludedIdsRaw.filter(id => existingFolderIds.has(id));
+
+      const hasConfig = selectedIds.length > 0 || excludedIds.length > 0;
+      const excludedSet = new Set<string>(excludedIds);
 
       const nodesToRemove: BookmarkInfo[] = [];
 
-      if (selectedIds.length && bookmarks[0]) {
-        // 使用与上传相同的过滤规则，得到“同步范围”子树
-        const filteredRoots = filterBookmarksBySelectedFolders(bookmarks as BookmarkInfo[], selectedIds);
-        const syncRoot = filteredRoots[0];
-        if (syncRoot && syncRoot.children) {
-          // 不删除根容器本身，只删除其子节点（与旧版 clear 行为一致）
-          for (const container of syncRoot.children) {
-            if (container.children) {
-              for (const child of container.children) {
-                nodesToRemove.push(child as BookmarkInfo);
-              }
+      if (hasConfig && rootNode && rootNode.children) {
+        // 有同步范围配置：以“排除列表”为准，保留 excluded 节点及其子孙，其余全部删除
+        const collect = (node: BookmarkInfo, hasExcludedAncestor: boolean) => {
+          const isExcludedHere = node.id ? excludedSet.has(node.id) : false;
+          const nextExcluded = hasExcludedAncestor || isExcludedHere;
+
+          if (!nextExcluded) {
+            nodesToRemove.push(node);
+          }
+
+          if (node.children) {
+            for (const child of node.children) {
+              collect(child as BookmarkInfo, nextExcluded);
             }
+          }
+        };
+
+        for (const container of rootNode.children) {
+          if (!container.children) continue;
+          for (const child of container.children) {
+            collect(child as BookmarkInfo, false);
           }
         }
       }
 
-      // 如果没有任何同步范围配置（selectedIds 为空），则退回到“清空所有用户书签”的旧行为
-      // 如果用户已经配置了同步范围但筛选结果为空，则认为“没有可清空的同步内容”，不再清空全部
-      if (!nodesToRemove.length && !hasSelection) {
-        if (bookmarks[0] && bookmarks[0].children) {
-          for (const c of bookmarks[0].children) {
+      if (!hasConfig) {
+        // 没有任何同步范围配置：退回到“清空所有用户书签”的旧行为
+        if (rootNode && rootNode.children) {
+          for (const c of rootNode.children) {
             if (c.children) {
               for (const d of c.children) {
-                nodesToRemove.push(d);
+                nodesToRemove.push(d as BookmarkInfo);
               }
             }
           }
         }
       }
 
-      // 去重后删除（跳过根节点及其第一层子容器，避免尝试删除系统 Root）
+     // 去重后删除（跳过根节点及其第一层子容器，避免尝试删除系统 Root）。
+      // 如果某个节点的祖先也在删除集合中，则只删除祖先，跳过该子节点，
+      // 避免在父节点 removeTree 后对子节点再次 removeTree 导致 "Can't find bookmark for id"。
+
+      const removeIdSet = new Set<string>();
+      for (const node of nodesToRemove) {
+        if (node.id) {
+          removeIdSet.add(node.id);
+        }
+      }
+
+      const hasAncestorInRemoveSet = (id: string): boolean => {
+        let current = parentMap.get(id) ?? null;
+        while (current) {
+          if (removeIdSet.has(current)) {
+            return true;
+          }
+          current = parentMap.get(current) ?? null;
+        }
+        return false;
+      };
+
       const seen = new Set<string>();
       for (const node of nodesToRemove) {
         if (!node.id || seen.has(node.id)) continue;
         if (rootNode && node.id === rootNode.id) continue;
         if (rootChildIds.has(node.id)) continue;
+        if (hasAncestorInRemoveSet(node.id)) continue;
         seen.add(node.id);
-        await browser.bookmarks.removeTree(node.id);
+        try {
+          await browser.bookmarks.removeTree(node.id);
+        } catch (err: any) {
+          // 某些情况下父节点已删除，子节点 id 会失效，这里忽略特定错误以保证清除过程不中断
+          if (err && typeof err.message === 'string' && err.message.includes("Can't find bookmark for id")) {
+            console.warn('Skip removing already-deleted node:', node.id, node.title);
+          } else {
+            throw err;
+          }
+        }
       }
 
       if (curOperType === OperType.REMOVE && setting.enableNotify) {
