@@ -10,7 +10,7 @@ export class SettingBase implements Options {
     githubURL: string = 'https://api.github.com';
     // Auto sync configuration
     autoSyncEnabled: boolean = false;
-    autoSyncInterval: number = 15; // minutes
+    autoSyncInterval: number = 5; // minutes
     lastSyncTime: number = 0; // timestamp
     // Encryption configuration
     enableEncrypt: boolean = false;
@@ -27,7 +27,7 @@ export class Setting extends SettingBase {
         setting.enableNotify = options.enableNotify;
         // Auto sync configuration mapping
         setting.autoSyncEnabled = options.autoSyncEnabled || false;
-        setting.autoSyncInterval = options.autoSyncInterval || 15;
+        setting.autoSyncInterval = options.autoSyncInterval || 5;
         setting.lastSyncTime = options.lastSyncTime || 0;
         // Encryption configuration mapping
         setting.enableEncrypt = options.enableEncrypt || false;

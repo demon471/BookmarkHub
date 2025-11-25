@@ -12,7 +12,7 @@ export default new OptionsSync({
         // Auto sync configuration
         autoSyncEnabled: false as boolean,
 
-        autoSyncInterval: 15,
+        autoSyncInterval: 5,
         lastSyncTime: 0,
         // Encryption configuration
         enableEncrypt: false as boolean,

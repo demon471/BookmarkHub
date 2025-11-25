@@ -95,6 +95,10 @@
         "message": "同步间隔",
         "description": ""
     },
+    "autoSyncInterval1": {
+        "message": "1分钟",
+        "description": ""
+    },
     "autoSyncInterval5": {
         "message": "5分钟",
         "description": ""

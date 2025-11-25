@@ -95,6 +95,10 @@
         "message": "Sync Interval",
         "description": ""
     },
+    "autoSyncInterval1": {
+        "message": "1 minute",
+        "description": ""
+    },
     "autoSyncInterval5": {
         "message": "5 minutes",
         "description": ""

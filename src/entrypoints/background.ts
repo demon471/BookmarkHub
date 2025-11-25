@@ -39,7 +39,7 @@ export default defineBackground(() => {
   let badgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let isClearing = false; // 标记是否正在清空书签，防止触发同步
   let autoDownloadTimer: ReturnType<typeof setInterval> | null = null;
-  const AUTO_DOWNLOAD_CHECK_INTERVAL_MS = 60 * 1000;
+  const AUTO_DOWNLOAD_CHECK_INTERVAL_MS = 30 * 1000; // 检查间隔改为30秒，更频繁地检查是否需要同步
 
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
@@ -1301,7 +1301,7 @@ export default defineBackground(() => {
       
       const data = await browser.storage.local.get(['lastSyncTime']);
       const lastSyncTime = data.lastSyncTime || 0;
-      const intervalMinutes = setting.autoSyncInterval || 15;
+      const intervalMinutes = setting.autoSyncInterval || 5;
       const intervalMs = intervalMinutes * 60 * 1000;
       const now = Date.now();
       const timeSinceLastSync = now - lastSyncTime;

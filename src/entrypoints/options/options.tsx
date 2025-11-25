@@ -92,14 +92,24 @@ const Popup: React.FC = () => {
 
     const encryptEnabled = !!watch('enableEncrypt');
 
-    const autoSyncIntervalValue = watch('autoSyncInterval') ?? 15;
+    const autoSyncIntervalValue = watch('autoSyncInterval') ?? 5;
     const autoSyncOptions = useMemo(
-        () => [
-            { value: 5, label: browser.i18n.getMessage('autoSyncInterval5') },
-            { value: 15, label: browser.i18n.getMessage('autoSyncInterval15') },
-            { value: 30, label: browser.i18n.getMessage('autoSyncInterval30') },
-            { value: 60, label: browser.i18n.getMessage('autoSyncInterval60') },
-        ],
+        () => {
+            const getMessage = (key: string, fallback: string) => {
+                try {
+                    return browser.i18n.getMessage(key as any) || fallback;
+                } catch {
+                    return fallback;
+                }
+            };
+            return [
+                { value: 1, label: getMessage('autoSyncInterval1', '每 1 分钟') },
+                { value: 5, label: getMessage('autoSyncInterval5', '每 5 分钟') },
+                { value: 15, label: getMessage('autoSyncInterval15', '每 15 分钟') },
+                { value: 30, label: getMessage('autoSyncInterval30', '每 30 分钟') },
+                { value: 60, label: getMessage('autoSyncInterval60', '每 1 小时') },
+            ];
+        },
         []
     );
     const [autoSyncDropdownOpen, setAutoSyncDropdownOpen] = useState(false);
@@ -141,7 +151,7 @@ const Popup: React.FC = () => {
             gistFileName: options.gistFileName || 'BookmarkHub',
             enableNotify: options.enableNotify !== false,
             autoSyncEnabled: options.autoSyncEnabled || false,
-            autoSyncInterval: options.autoSyncInterval || 15,
+            autoSyncInterval: options.autoSyncInterval || 5,
             enableEncrypt: options.enableEncrypt || false,
             encryptPassword: options.encryptPassword || '',
         });
@@ -225,7 +235,7 @@ const Popup: React.FC = () => {
                 gistFileName: data.gistFileName || 'BookmarkHub',
                 enableNotify: data.enableNotify !== false,
                 autoSyncEnabled: data.autoSyncEnabled || false,
-                autoSyncInterval: parseInt(data.autoSyncInterval) || 15,
+                autoSyncInterval: parseInt(data.autoSyncInterval) || 5,
                 enableEncrypt: data.enableEncrypt || false,
                 encryptPassword: data.encryptPassword || ''
             });
@@ -257,7 +267,7 @@ const Popup: React.FC = () => {
                     gistFileName: config.gistFileName || 'BookmarkHub',
                     enableNotify: config.enableNotify !== false,
                     autoSyncEnabled: config.autoSyncEnabled || false,
-                    autoSyncInterval: config.autoSyncInterval || 15,
+                    autoSyncInterval: config.autoSyncInterval || 5,
                     enableEncrypt: config.enableEncrypt || false,
                     encryptPassword: config.encryptPassword || ''
                 }
@@ -301,7 +311,7 @@ const Popup: React.FC = () => {
                 gistFileName: importData.config.gistFileName || 'BookmarkHub',
                 enableNotify: importData.config.enableNotify !== false,
                 autoSyncEnabled: importData.config.autoSyncEnabled || false,
-                autoSyncInterval: importData.config.autoSyncInterval || 15,
+                autoSyncInterval: importData.config.autoSyncInterval || 5,
                 enableEncrypt: importData.config.enableEncrypt || false,
                 encryptPassword: importData.config.encryptPassword || ''
             };
@@ -793,9 +803,10 @@ const Popup: React.FC = () => {
                                                     as="select"
                                                     name="autoSyncInterval"
                                                     ref={register}
-                                                    defaultValue="15"
+                                                    defaultValue="5"
                                                     style={{ display: 'none' }}
                                                 >
+                                                    <option value="1">{browser.i18n.getMessage('autoSyncInterval1') || '每 1 分钟'}</option>
                                                     <option value="5">{browser.i18n.getMessage('autoSyncInterval5')}</option>
                                                     <option value="15">{browser.i18n.getMessage('autoSyncInterval15')}</option>
                                                     <option value="30">{browser.i18n.getMessage('autoSyncInterval30')}</option>
