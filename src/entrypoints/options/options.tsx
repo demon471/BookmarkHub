@@ -805,7 +805,8 @@ const Popup: React.FC = () => {
                                                                         type="button"
                                                                         className={`options-select-option ${isActive ? 'options-select-option--active' : ''}`}
                                                                         onMouseDown={e => e.preventDefault()}
-                                                                        onClick={() => {
+                                                                        onClick={e => {
+                                                                            e.stopPropagation(); // 避免冒泡后父级再次切换为打开状态
                                                                             setValue('autoSyncInterval', String(opt.value));
                                                                             setAutoSyncDropdownOpen(false);
                                                                         }}
