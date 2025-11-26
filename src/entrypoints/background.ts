@@ -549,6 +549,9 @@ export default defineBackground(() => {
       // Update last sync time after successful upload
       await updateLastSyncTime();
       console.log('Last sync time updated');
+      
+      // 记录上传历史
+      await addSyncHistory('manual', 'success', Date.now(), `上传成功 (${count}个书签)`);
 
       // Update bookmark structure tracking
       await updateBookmarkStructureTracking();
@@ -574,6 +577,9 @@ export default defineBackground(() => {
       console.error('   Error message:', error.message);
       console.error('   Error stack:', error.stack);
       await showSyncBadge('error');
+      
+      // 记录上传失败历史
+      await addSyncHistory('manual', 'error', Date.now(), `上传失败: ${error.message}`);
 
       // 只在配置问题时显示一次提示
       const isConfigError = error.message?.includes('token') || error.message?.includes('gist') || error.message?.includes('401');
@@ -664,6 +670,10 @@ export default defineBackground(() => {
         // Update bookmark structure tracking
         await updateBookmarkStructureTracking();
         console.log('Bookmark structure tracking updated after download');
+        
+        // 记录下载历史
+        await addSyncHistory('manual', 'success', Date.now(), `下载成功 (${count}个书签)`);
+        
         if (setting.enableNotify) {
           await browser.notifications.create({
             type: 'basic',
@@ -691,6 +701,9 @@ export default defineBackground(() => {
 
       const message = error?.message || String(error || '');
       const isPasswordError = message.includes('远程数据已加密');
+      
+      // 记录下载失败历史
+      await addSyncHistory('manual', 'error', Date.now(), `下载失败: ${message}`);
 
       // 根据错误类型更新图标状态，并在密码错误时提醒弹窗
       if (isPasswordError) {
@@ -1237,8 +1250,33 @@ export default defineBackground(() => {
     try {
       const currentTime = Date.now();
       await browser.storage.local.set({ lastSyncTime: currentTime });
+      
+      // 添加到同步历史记录
+      await addSyncHistory('auto', 'success', currentTime);
     } catch (error) {
       console.error('Error updating last sync time:', error);
+    }
+  }
+
+  async function addSyncHistory(type: 'auto' | 'manual', status: 'success' | 'error', timestamp: number, message?: string): Promise<void> {
+    try {
+      const data = await browser.storage.local.get(['syncHistory']);
+      const history = Array.isArray(data.syncHistory) ? data.syncHistory : [];
+      
+      // 添加新记录
+      history.unshift({
+        type,
+        status,
+        timestamp,
+        message: message || (status === 'success' ? '同步成功' : '同步失败')
+      });
+      
+      // 只保留最近10条记录
+      const trimmedHistory = history.slice(0, 10);
+      
+      await browser.storage.local.set({ syncHistory: trimmedHistory });
+    } catch (error) {
+      console.error('Error adding sync history:', error);
     }
   }
 

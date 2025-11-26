@@ -27,6 +27,8 @@ const Popup: React.FC = () => {
     const [folderBookmarkCount, setFolderBookmarkCount] = useState<{ [id: string]: number }>({});
     const [allFolderIds, setAllFolderIds] = useState<string[]>([]);
     const [showEncryptPassword, setShowEncryptPassword] = useState(false);
+    const [showSyncHistory, setShowSyncHistory] = useState(false);
+    const [syncHistory, setSyncHistory] = useState<any[]>([]);
 
     const bookmarkActionMessageTimer = useRef<number | null>(null);
     const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -621,9 +623,20 @@ const Popup: React.FC = () => {
         );
     };
 
+    const loadSyncHistory = async () => {
+        try {
+            const data = await browser.storage.local.get(['syncHistory']);
+            const history = Array.isArray(data.syncHistory) ? data.syncHistory : [];
+            setSyncHistory(history.slice(0, 5)); // 只显示最近5条
+        } catch (error) {
+            console.error('Load sync history error:', error);
+        }
+    };
+
     useEffect(() => {
         loadConfig();
         loadFolderTree();
+        loadSyncHistory();
     }, []);
 
     const renderGlobalToast = (message: string, key: string) => {
@@ -641,6 +654,11 @@ const Popup: React.FC = () => {
 
     return (
         <Container className="options-root">
+            <SyncHistoryModal 
+                show={showSyncHistory} 
+                onHide={() => setShowSyncHistory(false)} 
+                history={syncHistory}
+            />
             {(saveMessage || importMessage || bookmarkActionMessage) && (
                 <div className="options-toast-container">
                     {saveMessage && renderGlobalToast(saveMessage, 'save')}
@@ -1007,6 +1025,26 @@ const Popup: React.FC = () => {
                                                 <span className="options-action-subtitle">从本地书签导出到外部文件</span>
                                             </span>
                                         </Button>
+
+                                        <Button
+                                            type="button"
+                                            className="options-action-button options-action-button--history"
+                                            onClick={() => {
+                                                loadSyncHistory();
+                                                setShowSyncHistory(true);
+                                            }}
+                                        >
+                                            <span className="options-action-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+                                                    <path d="M12 6v6l4 2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                </svg>
+                                            </span>
+                                            <span className="options-action-copy">
+                                                <span className="options-action-title">同步历史</span>
+                                                <span className="options-action-subtitle">查看最近的同步记录</span>
+                                            </span>
+                                        </Button>
                                     </div>
 
                                     <div className="options-feedback" />
@@ -1086,6 +1124,98 @@ const Popup: React.FC = () => {
         </Container >
     )
 }
+
+const SyncHistoryModal: React.FC<{ show: boolean; onHide: () => void; history: any[] }> = ({ show, onHide, history }) => {
+    // 弹窗打开时禁止背景滚动
+    useEffect(() => {
+        if (show) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [show]);
+
+    const formatTime = (timestamp: number) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now.getTime() - timestamp;
+        
+        // 如果是今天，只显示时间
+        if (diff < 86400000 && date.getDate() === now.getDate()) {
+            return date.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // 否则显示日期和时间
+        return date.toLocaleString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const getStatusIcon = (status: string) => {
+        return status === 'success' ? '✓' : '✗';
+    };
+
+    const getTypeLabel = (type: string) => {
+        return type === 'auto' ? '自动' : '手动';
+    };
+
+    return (
+        <Modal show={show} onHide={onHide} className="sync-history-modal" centered backdrop="static">
+            <Modal.Header>
+                <Modal.Title>同步历史</Modal.Title>
+                <button 
+                    type="button" 
+                    className="sync-history-close-btn" 
+                    onClick={onHide}
+                    aria-label="关闭"
+                >
+                    <span></span>
+                    <span></span>
+                </button>
+            </Modal.Header>
+            <Modal.Body>
+                {history.length === 0 ? (
+                    <div className="sync-history-empty">
+                        <div className="sync-history-empty-icon">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 6v6l4 2" strokeLinecap="round" />
+                            </svg>
+                        </div>
+                        <div className="sync-history-empty-text">暂无记录</div>
+                    </div>
+                ) : (
+                    <div className="sync-history-list">
+                        {history.map((item, index) => (
+                            <div key={index} className={`sync-history-item sync-history-item--${item.status}`}>
+                                <div className="sync-history-icon">
+                                    {getStatusIcon(item.status)}
+                                </div>
+                                <div className="sync-history-content">
+                                    <div className="sync-history-header">
+                                        <span className="sync-history-type">{getTypeLabel(item.type)}</span>
+                                        <span className="sync-history-time">{formatTime(item.timestamp)}</span>
+                                    </div>
+                                    <div className="sync-history-message">{item.message}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Modal.Body>
+        </Modal>
+    );
+};
 
 const OptionsWithModal: React.FC = () => {
     return (
