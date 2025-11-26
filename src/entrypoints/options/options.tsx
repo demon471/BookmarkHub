@@ -1129,13 +1129,25 @@ const SyncHistoryModal: React.FC<{ show: boolean; onHide: () => void; history: a
     // 弹窗打开时禁止背景滚动
     useEffect(() => {
         if (show) {
-            document.body.style.overflow = 'hidden';
+            const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+            // 记录滚动条宽度，用于补偿 padding，避免隐藏滚动条时触发布局抖动
+            document.documentElement.style.setProperty('--options-scrollbar-comp', `${scrollbarWidth}px`);
+            document.body.style.setProperty('--options-scrollbar-comp', `${scrollbarWidth}px`);
+
+            document.body.classList.add('options-modal-open');
+            document.documentElement.classList.add('options-modal-open');
         } else {
-            document.body.style.overflow = '';
+            document.body.classList.remove('options-modal-open');
+            document.documentElement.classList.remove('options-modal-open');
+            document.documentElement.style.removeProperty('--options-scrollbar-comp');
+            document.body.style.removeProperty('--options-scrollbar-comp');
         }
-        
+
         return () => {
-            document.body.style.overflow = '';
+            document.body.classList.remove('options-modal-open');
+            document.documentElement.classList.remove('options-modal-open');
+            document.documentElement.style.removeProperty('--options-scrollbar-comp');
+            document.body.style.removeProperty('--options-scrollbar-comp');
         };
     }, [show]);
 
@@ -1196,20 +1208,25 @@ const SyncHistoryModal: React.FC<{ show: boolean; onHide: () => void; history: a
                     </div>
                 ) : (
                     <div className="sync-history-list">
-                        {history.map((item, index) => (
-                            <div key={index} className={`sync-history-item sync-history-item--${item.status}`}>
+                        {history.map((item, index) => {
+                            const typeClass = item.type === 'auto' ? 'sync-history-item--auto' : 'sync-history-item--manual';
+                            const typeLabelClass = item.type === 'auto' ? 'sync-history-type--auto' : 'sync-history-type--manual';
+                            return (
+                            <div key={index} className={`sync-history-item sync-history-item--${item.status} ${typeClass}`}>
                                 <div className="sync-history-icon">
                                     {getStatusIcon(item.status)}
                                 </div>
                                 <div className="sync-history-content">
-                                    <div className="sync-history-header">
-                                        <span className="sync-history-type">{getTypeLabel(item.type)}</span>
+                                    <div className="sync-history-row">
+                                        <span className={`sync-history-type ${typeLabelClass}`}>
+                                            {getTypeLabel(item.type)}
+                                        </span>
+                                        <span className="sync-history-message">{item.message}</span>
                                         <span className="sync-history-time">{formatTime(item.timestamp)}</span>
                                     </div>
-                                    <div className="sync-history-message">{item.message}</div>
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                 )}
             </Modal.Body>

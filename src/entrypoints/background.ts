@@ -38,8 +38,8 @@ export default defineBackground(() => {
   let configChangeTimer: ReturnType<typeof setTimeout> | null = null;
   let badgeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let isClearing = false; // 标记是否正在清空书签，防止触发同步
-  let autoDownloadTimer: ReturnType<typeof setInterval> | null = null;
-  const AUTO_DOWNLOAD_CHECK_INTERVAL_MS = 30 * 1000; // 检查间隔改为30秒，更频繁地检查是否需要同步
+  const AUTO_DOWNLOAD_ALARM = 'auto-download';
+  const MIN_AUTO_SYNC_INTERVAL_MINUTES = 1; // 自动同步最小周期（分钟），避免过于频繁
 
   browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.name === 'upload') {
@@ -55,7 +55,7 @@ export default defineBackground(() => {
     if (msg.name === 'download') {
       curOperType = OperType.SYNC
       // 普通下载：与本地合并，不清空本地未同步书签
-      downloadBookmarks({ mergeLocal: true }).then(() => {
+      downloadBookmarks({ mergeLocal: true, type: 'manual' }).then(() => {
         curOperType = OperType.NONE
         // Badge handled by downloadBookmarks()
         refreshLocalCount();
@@ -172,7 +172,7 @@ export default defineBackground(() => {
       console.log('📥 Initial sync: Downloading remote bookmarks to local...');
       curOperType = OperType.SYNC;
       // 初始同步下载：与本地合并，不清空用户原有书签
-      downloadBookmarks({ mergeLocal: true }).then(async () => {
+      downloadBookmarks({ mergeLocal: true, type: 'manual' }).then(async () => {
         curOperType = OperType.NONE;
         console.log('✅ Initial sync download completed');
         await browser.storage.local.set({ initialSyncCompleted: true });
@@ -547,7 +547,7 @@ export default defineBackground(() => {
       console.log('Remote count updated:', count);
 
       // Update last sync time after successful upload
-      await updateLastSyncTime();
+      await updateLastSyncTime('manual');
       console.log('Last sync time updated');
       
       // 记录上传历史
@@ -610,7 +610,7 @@ export default defineBackground(() => {
     }
   }
 
-  async function downloadBookmarks(options?: { mergeLocal?: boolean }) {
+  async function downloadBookmarks(options?: { mergeLocal?: boolean; type?: 'manual' | 'auto' }) {
     try {
       console.log('Starting download bookmarks...');
       await showSyncBadge('syncing');
@@ -631,6 +631,7 @@ export default defineBackground(() => {
           return;
         }
         const mergeLocal = options?.mergeLocal === true;
+        const syncType: 'manual' | 'auto' = options?.type === 'auto' ? 'auto' : 'manual';
 
         if (mergeLocal) {
           // 与本地合并：不清空本地，只把远程书签插入当前书签树中
@@ -642,7 +643,7 @@ export default defineBackground(() => {
             console.log('Local and remote bookmarks are identical, skip merge download');
             const count = getBookmarkCount(syncdata.bookmarks);
             await browser.storage.local.set({ remoteCount: count });
-            await updateLastSyncTime();
+            await updateLastSyncTime(syncType);
             await updateBookmarkStructureTracking();
             await showSyncBadge('success');
             await refreshLocalCount();
@@ -666,13 +667,15 @@ export default defineBackground(() => {
         const count = getBookmarkCount(syncdata.bookmarks);
         await browser.storage.local.set({ remoteCount: count });
         // Update last sync time after successful download
-        await updateLastSyncTime();
+        await updateLastSyncTime(syncType);
         // Update bookmark structure tracking
         await updateBookmarkStructureTracking();
         console.log('Bookmark structure tracking updated after download');
         
-        // 记录下载历史
-        await addSyncHistory('manual', 'success', Date.now(), `下载成功 (${count}个书签)`);
+        // 记录下载历史（手动记录，自动同步已在 updateLastSyncTime 内追加）
+        if (syncType === 'manual') {
+          await addSyncHistory('manual', 'success', Date.now(), `下载成功 (${count}个书签)`);
+        }
         
         if (setting.enableNotify) {
           await browser.notifications.create({
@@ -1246,13 +1249,15 @@ export default defineBackground(() => {
     }
   }
 
-  async function updateLastSyncTime(): Promise<void> {
+  async function updateLastSyncTime(type: 'auto' | 'manual' = 'auto'): Promise<void> {
     try {
       const currentTime = Date.now();
       await browser.storage.local.set({ lastSyncTime: currentTime });
-      
-      // 添加到同步历史记录
-      await addSyncHistory('auto', 'success', currentTime);
+
+      // 自动同步时记一次历史，手动同步由调用方单独记录，避免重复
+      if (type === 'auto') {
+        await addSyncHistory('auto', 'success', currentTime);
+      }
     } catch (error) {
       console.error('Error updating last sync time:', error);
     }
@@ -1364,7 +1369,7 @@ export default defineBackground(() => {
       console.log('🚀 Auto download triggered! Starting merge download...');
       curOperType = OperType.SYNC;
       try {
-        await downloadBookmarks({ mergeLocal: true });
+        await downloadBookmarks({ mergeLocal: true, type: 'auto' });
         console.log('✅ Auto download completed successfully');
       } finally {
         curOperType = OperType.NONE;
@@ -1375,25 +1380,44 @@ export default defineBackground(() => {
     }
   }
 
-  function startAutoDownloadTimer() {
-    if (autoDownloadTimer) {
-      clearInterval(autoDownloadTimer);
-      autoDownloadTimer = null;
+  async function scheduleAutoDownloadWithAlarm(settingFromCaller?: Setting) {
+    const setting = settingFromCaller ?? await Setting.build();
+
+    await browser.alarms.clear(AUTO_DOWNLOAD_ALARM);
+
+    if (!setting.autoSyncEnabled) {
+      console.log('🔕 Auto-download disabled, alarm cleared');
+      return;
     }
-    autoDownloadTimer = setInterval(() => {
-      triggerAutoDownloadIfEnabled().catch(error => {
-        console.error('❌ Auto download timer tick error:', error);
-      });
-    }, AUTO_DOWNLOAD_CHECK_INTERVAL_MS);
-    console.log('⏰ Auto-download timer started. Check interval (seconds):', AUTO_DOWNLOAD_CHECK_INTERVAL_MS / 1000);
+
+    const intervalMinutes = Math.max(Number(setting.autoSyncInterval) || 5, MIN_AUTO_SYNC_INTERVAL_MINUTES);
+    browser.alarms.create(AUTO_DOWNLOAD_ALARM, {
+      delayInMinutes: intervalMinutes,
+      periodInMinutes: intervalMinutes,
+    });
+    console.log('⏲ Auto-download alarm scheduled. Interval (minutes):', intervalMinutes);
   }
 
-  function stopAutoDownloadTimer() {
-    if (autoDownloadTimer) {
-      clearInterval(autoDownloadTimer);
-      autoDownloadTimer = null;
-      console.log('⏹️ Auto-download timer stopped');
+  async function startAutoDownloadTimer(settingFromCaller?: Setting) {
+    try {
+      const setting = settingFromCaller ?? await Setting.build();
+      if (!setting.autoSyncEnabled) {
+        console.log('🔕 Auto-download disabled, timer will not run');
+        await browser.alarms.clear(AUTO_DOWNLOAD_ALARM);
+        return;
+      }
+
+      // 先立刻检查一次，避免开启后还要等一个周期
+      await triggerAutoDownloadIfEnabled();
+      await scheduleAutoDownloadWithAlarm(setting);
+    } catch (error) {
+      console.error('❌ Failed to start auto-download timer:', error);
     }
+  }
+
+  async function stopAutoDownloadTimer() {
+    await browser.alarms.clear(AUTO_DOWNLOAD_ALARM);
+    console.log('⏹️ Auto-download alarm cleared');
   }
 
   async function initializeAutoDownloadFromSettings(): Promise<void> {
@@ -1401,15 +1425,25 @@ export default defineBackground(() => {
       const setting = await Setting.build();
       if (setting.autoSyncEnabled) {
         console.log('⚙️ Auto-download enabled in settings. Interval (minutes):', setting.autoSyncInterval);
-        startAutoDownloadTimer();
+        await startAutoDownloadTimer(setting);
       } else {
         console.log('⚙️ Auto-download disabled in settings, timer will not run');
-        stopAutoDownloadTimer();
+        await stopAutoDownloadTimer();
       }
     } catch (error) {
       console.error('❌ Failed to initialize auto-download from settings:', error);
     }
   }
+
+  // 使用 alarms 确保在 MV3 后台存活机制下也能准时触发自动拉取
+  browser.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name !== AUTO_DOWNLOAD_ALARM) return;
+    try {
+      await triggerAutoDownloadIfEnabled();
+    } catch (error) {
+      console.error('❌ Auto-download alarm handler error:', error);
+    }
+  });
 
   ///暂时不启用自动备份
   /*

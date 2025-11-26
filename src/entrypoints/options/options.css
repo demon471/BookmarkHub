@@ -1063,18 +1063,27 @@ html, body {
 /* 同步历史弹窗样式 */
 .sync-history-modal {
   z-index: 9999;
+  position: fixed; /* 固定在视口内，避免撑大页面 */
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  pointer-events: none; /* 只允许对话框交互 */
 }
 
 .sync-history-modal .modal-dialog {
-  max-width: 480px;
-  margin: 1.75rem auto;
+  max-width: 180px;
+  margin: 0;
+  position: static; /* 由父级 flex 居中 */
+  transform: none;
   pointer-events: auto;
 }
 
 .sync-history-modal .modal-content {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: var(--shadow-soft);
   color: var(--text-primary);
 }
@@ -1094,15 +1103,21 @@ body.modal-open {
   padding-right: 0 !important;
 }
 
+/* 自定义类，用于锁定滚动且不增加额外右侧填充，避免出现滚动条 */
+.options-modal-open {
+  overflow: hidden !important;
+  padding-right: var(--options-scrollbar-comp, 0px) !important;
+}
+
 .sync-history-modal .modal-header {
   border-bottom: 1px solid var(--border);
-  padding: 14px 18px;
+  padding: 10px 14px;
   background: var(--surface-alt);
-  border-radius: 16px 16px 0 0;
+  border-radius: 12px 12px 0 0;
 }
 
 .sync-history-modal .modal-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -1163,15 +1178,22 @@ body.modal-open {
 }
 
 .sync-history-modal .modal-body {
-  padding: 12px 18px 18px;
+  padding: 10px 14px 14px;
   background: var(--surface);
+  max-height: 60vh;
+  overflow: hidden; /* 不展示滚动条，内容保持紧凑 */
+  scrollbar-width: none; /* 隐藏滚动条（Firefox） */
+}
+
+.sync-history-modal .modal-body::-webkit-scrollbar {
+  display: none; /* 隐藏滚动条（WebKit） */
 }
 
 /* 同步历史列表样式 */
 .sync-history-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 2px;
 }
 
@@ -1208,10 +1230,10 @@ body.modal-open {
 .sync-history-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 10px;
-  background: var(--surface-alt);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.03), rgba(15, 23, 42, 0.02));
   border: 1px solid var(--border);
   transition: all 0.15s ease;
   position: relative;
@@ -1237,6 +1259,15 @@ body.modal-open {
   background: #ef4444;
 }
 
+/* 按同步类型区分颜色，便于快速识别自动/手动 */
+.sync-history-item--auto::before {
+  background: #2563eb;
+}
+
+.sync-history-item--manual::before {
+  background: #f59e0b;
+}
+
 .sync-history-item:hover {
   transform: translateX(1px);
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
@@ -1250,13 +1281,13 @@ body.modal-open {
 }
 
 .sync-history-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
@@ -1286,12 +1317,16 @@ body.modal-open {
 }
 
 .sync-history-type {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-primary);
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .sync-history-type::before {
@@ -1303,6 +1338,34 @@ body.modal-open {
   background: var(--accent);
 }
 
+.sync-history-type--auto {
+  color: #2563eb;
+}
+
+.sync-history-type--manual {
+  color: #d97706;
+}
+
+.sync-history-item--auto .sync-history-type::before {
+  background: #2563eb;
+}
+
+.sync-history-item--manual .sync-history-type::before {
+  background: #d97706;
+}
+
+.sync-history-type--auto {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
+.sync-history-type--manual {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.45);
+}
+
 .sync-history-time {
   font-size: 10px;
   color: var(--muted);
@@ -1311,12 +1374,30 @@ body.modal-open {
 }
 
 .sync-history-message {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-secondary);
   line-height: 1.4;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-history-row .sync-history-message {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.sync-history-time {
+  font-size: 10px;
+  color: var(--muted);
   white-space: nowrap;
 }
 
@@ -1360,4 +1441,23 @@ body.modal-open {
   .sync-history-message {
     font-size: 10px;
   }
+}
+
+/* 同步历史弹窗样式优化 */
+.sync-history-modal .modal-dialog {
+  max-width: 500px !important;
+  margin: 1.75rem auto;
+}
+
+/* 防止弹窗影响页面布局 */
+body.modal-open {
+  padding-right: 0 !important;
+}
+
+body.modal-open #root,
+body.modal-open .options-root,
+body.modal-open .options-layout,
+body.modal-open .options-col {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
 }
