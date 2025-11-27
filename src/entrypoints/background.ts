@@ -633,35 +633,33 @@ export default defineBackground(() => {
         const mergeLocal = options?.mergeLocal === true;
         const syncType: 'manual' | 'auto' = options?.type === 'auto' ? 'auto' : 'manual';
 
-        if (mergeLocal) {
-          // 与本地合并：不清空本地，只把远程书签插入当前书签树中
-          // 先比较结构，若本地与远程完全一致则直接跳过，避免重复插入
-          const localBookmarks = await getBookmarks();
-          const localFormatted = formatBookmarks(localBookmarks);
-          const remoteFormatted = syncdata.bookmarks;
-          if (JSON.stringify(localFormatted) === JSON.stringify(remoteFormatted)) {
-            console.log('Local and remote bookmarks are identical, skip merge download');
-            const count = getBookmarkCount(syncdata.bookmarks);
-            await browser.storage.local.set({ remoteCount: count });
-            await updateLastSyncTime(syncType);
-            await updateBookmarkStructureTracking();
-            await showSyncBadge('success');
-            await refreshLocalCount();
-            return;
-          }
+        // 先比较结构，若本地与远程完全一致则直接跳过
+        const localBookmarks = await getBookmarks();
+        const localFormatted = formatBookmarks(localBookmarks);
+        const remoteFormatted = syncdata.bookmarks;
+        
+        console.log('🔍 Comparing local and remote bookmarks...');
+        console.log('   📊 Local count:', getBookmarkCount(localFormatted));
+        console.log('   📊 Remote count:', getBookmarkCount(remoteFormatted));
+        
+        if (JSON.stringify(localFormatted) === JSON.stringify(remoteFormatted)) {
+          console.log('✅ Local and remote are identical, skip download');
+          const count = getBookmarkCount(syncdata.bookmarks);
+          await browser.storage.local.set({ remoteCount: count });
+          await updateLastSyncTime(syncType);
+          await updateBookmarkStructureTracking();
+          await showSyncBadge('success');
+          await refreshLocalCount();
+          return;
+        }
 
-          // 结构不同，再执行合并创建
-          await createBookmarkTree(syncdata.bookmarks);
-        } else {
-          // 覆盖模式：清空现有书签，再根据远程数据重建
-          // 设置清空标志，防止下载过程中的删除操作触发同步
-          isClearing = true;
-          try {
-            await clearBookmarkTree();
-            await createBookmarkTree(syncdata.bookmarks);
-          } finally {
-            isClearing = false;
-          }
+        console.log('🔄 Structures differ, syncing from remote...');
+        // 使用增量同步，避免闪动
+        isClearing = true;
+        try {
+          await syncBookmarksIncremental(syncdata.bookmarks);
+        } finally {
+          isClearing = false;
         }
 
         const count = getBookmarkCount(syncdata.bookmarks);
@@ -1036,13 +1034,36 @@ export default defineBackground(() => {
 
       const hasConfig = selectedIds.length > 0 || excludedIds.length > 0;
       const excludedSet = new Set<string>(excludedIds);
+      
+      // 构建被排除文件夹的标题集合（用于跨下载会话保留，因为ID会变化）
+      const excludedTitles = new Set<string>();
+      const findNodeById = (nodes: BookmarkInfo[], targetId: string): BookmarkInfo | null => {
+        for (const n of nodes) {
+          if (n.id === targetId) return n;
+          if (n.children) {
+            const found = findNodeById(n.children, targetId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      for (const id of excludedSet) {
+        const node = findNodeById([rootNode], id);
+        if (node && node.title) {
+          excludedTitles.add(node.title);
+        }
+      }
+      
+      console.log('🗑️ Clearing bookmarks - excluded titles:', Array.from(excludedTitles));
 
       const nodesToRemove: BookmarkInfo[] = [];
 
       if (hasConfig && rootNode && rootNode.children) {
         // 有同步范围配置：以“排除列表”为准，保留 excluded 节点及其子孙，其余全部删除
         const collect = (node: BookmarkInfo, hasExcludedAncestor: boolean) => {
-          const isExcludedHere = node.id ? excludedSet.has(node.id) : false;
+          const isExcludedById = node.id ? excludedSet.has(node.id) : false;
+          const isExcludedByTitle = node.title ? excludedTitles.has(node.title) : false;
+          const isExcludedHere = isExcludedById || isExcludedByTitle;
           const nextExcluded = hasExcludedAncestor || isExcludedHere;
 
           if (!nextExcluded) {
@@ -1137,10 +1158,171 @@ export default defineBackground(() => {
     }
   }
 
+  // 增量同步：只处理差异部分，避免闪动
+  async function syncBookmarksIncremental(remoteBookmarks: BookmarkInfo[] | undefined) {
+    if (!remoteBookmarks) return;
+    
+    console.log('🔄 Starting incremental sync...');
+    
+    // 获取被排除的文件夹标题
+    const stored = await browser.storage.local.get(['excludedFolderIds']);
+    const excludedIds = Array.isArray(stored.excludedFolderIds) ? stored.excludedFolderIds as string[] : [];
+    const excludedTitles = new Set<string>();
+    
+    if (excludedIds.length > 0) {
+      const localTree = await browser.bookmarks.getTree();
+      const findTitle = (nodes: any[], id: string): string | null => {
+        for (const n of nodes) {
+          if (n.id === id) return n.title;
+          if (n.children) {
+            const found = findTitle(n.children, id);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      for (const id of excludedIds) {
+        const title = findTitle(localTree, id);
+        if (title) excludedTitles.add(title);
+      }
+    }
+    
+    // 递归同步每个根文件夹
+    for (const remoteRoot of remoteBookmarks) {
+      // 跳过被排除的文件夹
+      if (remoteRoot.title && excludedTitles.has(remoteRoot.title)) {
+        console.log(`⏭️ Skipping excluded folder: ${remoteRoot.title}`);
+        continue;
+      }
+      
+      // 确定目标父ID
+      let targetParentId = '2'; // 默认其他书签
+      if (curBrowserType === BrowserType.FIREFOX) {
+        switch (remoteRoot.title) {
+          case RootBookmarksType.MenuFolder: targetParentId = 'menu________'; break;
+          case RootBookmarksType.MobileFolder: targetParentId = 'mobile______'; break;
+          case RootBookmarksType.ToolbarFolder: targetParentId = 'toolbar_____'; break;
+          case RootBookmarksType.UnfiledFolder: targetParentId = 'unfiled_____'; break;
+        }
+      } else {
+        switch (remoteRoot.title) {
+          case RootBookmarksType.MobileFolder: targetParentId = '3'; break;
+          case RootBookmarksType.ToolbarFolder: targetParentId = '1'; break;
+          case RootBookmarksType.UnfiledFolder:
+          case RootBookmarksType.MenuFolder: targetParentId = '2'; break;
+        }
+      }
+      
+      // 获取本地该父目录下的现有书签
+      let localChildren: Bookmarks.BookmarkTreeNode[] = [];
+      try {
+        localChildren = await browser.bookmarks.getChildren(targetParentId);
+      } catch (e) {
+        console.warn(`Failed to get children of ${targetParentId}:`, e);
+      }
+      
+      // 过滤掉被排除的本地文件夹
+      const localChildrenFiltered = localChildren.filter(c => !excludedTitles.has(c.title));
+      
+      // 同步子节点
+      await syncChildren(targetParentId, remoteRoot.children || [], localChildrenFiltered, excludedTitles);
+    }
+    
+    console.log('✅ Incremental sync completed');
+  }
+  
+  // 同步子节点：对比本地和远程，增删改
+  async function syncChildren(
+    parentId: string,
+    remoteChildren: BookmarkInfo[],
+    localChildren: Bookmarks.BookmarkTreeNode[],
+    excludedTitles: Set<string>
+  ) {
+    const localMap = new Map<string, Bookmarks.BookmarkTreeNode>();
+    for (const local of localChildren) {
+      // 用 title+url 或 title(文件夹) 作为key
+      const key = local.url ? `${local.title}|${local.url}` : `folder:${local.title}`;
+      localMap.set(key, local);
+    }
+    
+    const processedLocalIds = new Set<string>();
+    
+    // 遍历远程书签，创建或更新
+    for (let i = 0; i < remoteChildren.length; i++) {
+      const remote = remoteChildren[i];
+      
+      // 跳过被排除的文件夹
+      if (!remote.url && remote.title && excludedTitles.has(remote.title)) {
+        continue;
+      }
+      
+      const key = remote.url ? `${remote.title}|${remote.url}` : `folder:${remote.title}`;
+      const existing = localMap.get(key);
+      
+      if (existing) {
+        // 已存在，标记为已处理
+        processedLocalIds.add(existing.id);
+        
+        // 如果是文件夹，递归同步子节点
+        if (!remote.url && remote.children) {
+          let existingChildren: Bookmarks.BookmarkTreeNode[] = [];
+          try {
+            existingChildren = await browser.bookmarks.getChildren(existing.id);
+          } catch (e) { /* ignore */ }
+          
+          const filteredChildren = existingChildren.filter(c => !excludedTitles.has(c.title));
+          await syncChildren(existing.id, remote.children, filteredChildren, excludedTitles);
+        }
+      } else {
+        // 不存在，创建新的
+        try {
+          if (remote.url) {
+            await browser.bookmarks.create({
+              parentId,
+              title: remote.title,
+              url: remote.url,
+            });
+          } else {
+            const newFolder = await browser.bookmarks.create({
+              parentId,
+              title: remote.title,
+            });
+            // 递归创建子节点
+            if (remote.children && remote.children.length > 0) {
+              await syncChildren(newFolder.id, remote.children, [], excludedTitles);
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to create bookmark "${remote.title}":`, e);
+        }
+      }
+    }
+    
+    // 删除本地多余的书签（不在远程中的）
+    for (const local of localChildren) {
+      if (!processedLocalIds.has(local.id)) {
+        // 跳过被排除的文件夹
+        if (!local.url && excludedTitles.has(local.title)) {
+          continue;
+        }
+        try {
+          if (local.url) {
+            await browser.bookmarks.remove(local.id);
+          } else {
+            await browser.bookmarks.removeTree(local.id);
+          }
+        } catch (e) {
+          console.warn(`Failed to remove bookmark "${local.title}":`, e);
+        }
+      }
+    }
+  }
+
   async function createBookmarkTree(bookmarkList: BookmarkInfo[] | undefined) {
     if (!bookmarkList) {
       return;
     }
+    console.log(`🔄 Creating bookmark tree with ${bookmarkList.length} root items`);
     for (let i = 0; i < bookmarkList.length; i++) {
       const node = bookmarkList[i];
       if (
