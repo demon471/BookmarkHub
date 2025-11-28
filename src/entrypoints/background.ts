@@ -214,6 +214,13 @@ export default defineBackground(() => {
   browser.bookmarks.onCreated.addListener(async (id, info) => {
     console.log('📌 Bookmark created:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
+      const createdInExcludedFolder = await isBookmarkInExcludedFolder(info.parentId);
+      if (createdInExcludedFolder) {
+        console.log('⏭️ Bookmark created inside excluded folder, skipping auto upload');
+        refreshLocalCount();
+        await updateBookmarkStructureTracking();
+        return;
+      }
       console.log('✅ Triggering badge and auto-sync check for created bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -257,6 +264,14 @@ export default defineBackground(() => {
   browser.bookmarks.onRemoved.addListener(async (id, info) => {
     console.log("Bookmark removed:", id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
+      const parentId = info.parentId ?? info.node?.parentId;
+      const removedFromExcludedFolder = await isBookmarkInExcludedFolder(parentId);
+      if (removedFromExcludedFolder) {
+        console.log('⏭️ Bookmark removed inside excluded folder, skipping auto upload');
+        refreshLocalCount();
+        await updateBookmarkStructureTracking();
+        return;
+      }
       console.log('✅ Triggering badge and auto-sync check for removed bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -888,6 +903,49 @@ export default defineBackground(() => {
       curBrowserType = BrowserType.CHROME;
     }
     return bookmarkTree;
+  }
+
+  async function isBookmarkInExcludedFolder(parentId?: string | null): Promise<boolean> {
+    if (!parentId) {
+      return false;
+    }
+    try {
+      const stored = await browser.storage.local.get(['excludedFolderIds']);
+      const excludedIds = Array.isArray(stored.excludedFolderIds)
+        ? (stored.excludedFolderIds as string[])
+        : [];
+
+      if (!excludedIds.length) {
+        return false;
+      }
+
+      const excludedSet = new Set<string>(excludedIds);
+      let currentId: string | undefined | null = parentId;
+      const visited = new Set<string>();
+
+      while (currentId) {
+        if (excludedSet.has(currentId)) {
+          return true;
+        }
+        if (visited.has(currentId)) {
+          break;
+        }
+        visited.add(currentId);
+        try {
+          const nodes: Bookmarks.BookmarkTreeNode[] = await browser.bookmarks.get(currentId);
+          if (!nodes || !nodes.length) {
+            break;
+          }
+          currentId = nodes[0].parentId;
+        } catch (error) {
+          console.warn('Failed to resolve bookmark parent chain:', error);
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to check excluded folders for new bookmark:', error);
+    }
+    return false;
   }
 
   async function refreshLocalCount() {
