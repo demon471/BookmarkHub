@@ -1461,3 +1461,225 @@ body.modal-open .options-col {
   padding-right: 0 !important;
   margin-right: 0 !important;
 }
+
+/* 导出书签弹窗样式 */
+.export-bookmark-modal.modal {
+  z-index: 9999;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.export-bookmark-modal .modal-dialog {
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.export-bookmark-modal .modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.export-bookmark-modal .modal-header {
+  border-bottom: 1px solid var(--border);
+  padding: 18px 20px;
+  background: linear-gradient(135deg, var(--surface-alt), var(--surface));
+  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.export-bookmark-modal .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-bookmark-modal .modal-title::before {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  border-radius: 6px;
+  mask: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 13a4 4 0 0 0-4-4h-1" fill="none" stroke="black" stroke-width="2"/><path d="M11 9H8a4 4 0 1 0 0 8h2" fill="none" stroke="black" stroke-width="2"/><path d="M12 8v10" fill="none" stroke="black" stroke-width="2"/><path d="M9 15l3 3 3-3" fill="none" stroke="black" stroke-width="2"/></svg>') center/contain no-repeat;
+  -webkit-mask: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 13a4 4 0 0 0-4-4h-1" fill="none" stroke="black" stroke-width="2"/><path d="M11 9H8a4 4 0 1 0 0 8h2" fill="none" stroke="black" stroke-width="2"/><path d="M12 8v10" fill="none" stroke="black" stroke-width="2"/><path d="M9 15l3 3 3-3" fill="none" stroke="black" stroke-width="2"/></svg>') center/contain no-repeat;
+}
+
+.export-bookmark-modal .modal-body {
+  padding: 20px;
+  background: var(--surface);
+  min-height: 180px;
+}
+
+.export-option-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.export-option-description {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.export-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+}
+
+.export-option-group .form-check {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  margin: 0;
+  position: relative;
+}
+
+.export-option-group .form-check:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  transform: translateX(2px);
+}
+
+.export-option-group .form-check-input {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  margin: 0;
+  cursor: pointer;
+  border: 2px solid var(--muted);
+  background: var(--surface-alt);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+}
+
+.export-option-group .form-check-input:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.export-option-group .form-check-input:hover {
+  border-color: var(--accent);
+}
+
+.export-option-group .form-check-label {
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  line-height: 1.6;
+  flex: 1;
+  font-weight: 500;
+  position: relative;
+  z-index: 2;
+  user-select: none;
+}
+
+.export-bookmark-modal .modal-footer {
+  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  background: var(--surface-alt);
+  border-radius: 0;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.export-bookmark-modal .modal-footer .btn {
+  padding: 9px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 90px;
+}
+
+.export-bookmark-modal .modal-footer .btn-secondary {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.export-bookmark-modal .modal-footer .btn-secondary:hover {
+  background: var(--surface-alt);
+  border-color: var(--muted);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.export-bookmark-modal .modal-footer .btn-primary {
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  border: none;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.export-bookmark-modal .modal-footer .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+}
+
+/* 确保弹窗背景遮罩正确显示 */
+.export-bookmark-modal.modal.show {
+  display: flex !important;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+@media (max-width: 768px) {
+  .export-bookmark-modal .modal-dialog {
+    max-width: calc(100% - 32px);
+    margin: 0 auto;
+  }
+
+  .export-bookmark-modal .modal-header,
+  .export-bookmark-modal .modal-body,
+  .export-bookmark-modal .modal-footer {
+    padding: 16px 18px;
+  }
+
+  .export-option-group .form-check {
+    padding: 12px 14px;
+  }
+
+  .export-option-group .form-check-label {
+    font-size: 13px;
+  }
+  
+  .export-bookmark-modal .modal-footer .btn {
+    min-width: 80px;
+    padding: 9px 18px;
+  }
+}

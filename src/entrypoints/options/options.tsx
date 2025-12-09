@@ -29,6 +29,8 @@ const Popup: React.FC = () => {
     const [showEncryptPassword, setShowEncryptPassword] = useState(false);
     const [showSyncHistory, setShowSyncHistory] = useState(false);
     const [syncHistory, setSyncHistory] = useState<any[]>([]);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportIncludeExcluded, setExportIncludeExcluded] = useState(false);
 
     const bookmarkActionMessageTimer = useRef<number | null>(null);
     const bookmarkFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -486,12 +488,18 @@ const Popup: React.FC = () => {
         }
     };
 
-    const handleManualBookmarkDownload = async () => {
+    const handleManualBookmarkDownload = () => {
+        // 打开导出选项弹窗
+        setShowExportModal(true);
+    };
+
+    const handleConfirmExport = async () => {
+        setShowExportModal(false);
         setBookmarkActionLoading('download');
         try {
             const result = await browser.runtime.sendMessage({
                 name: 'exportBookmarksToFile',
-                selectedFolderIds,
+                selectedFolderIds: exportIncludeExcluded ? undefined : selectedFolderIds,
             });
 
             if (!result || !result.ok || !result.data) {
@@ -508,7 +516,8 @@ const Popup: React.FC = () => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            showBookmarkActionMessage('✅ 已导出书签到文件');
+            const includeText = exportIncludeExcluded ? '（包含排除书签）' : '（仅已选书签）';
+            showBookmarkActionMessage(`✅ 已导出书签到文件${includeText}`);
         } catch (error: any) {
             console.error('Manual bookmark export error:', error);
             showBookmarkActionMessage(`❌ 导出失败：${error.message || '请稍后重试'}`);
@@ -658,6 +667,14 @@ const Popup: React.FC = () => {
                 show={showSyncHistory} 
                 onHide={() => setShowSyncHistory(false)} 
                 history={syncHistory}
+            />
+            <ExportBookmarkModal
+                show={showExportModal}
+                onHide={() => setShowExportModal(false)}
+                onConfirm={handleConfirmExport}
+                includeExcluded={exportIncludeExcluded}
+                setIncludeExcluded={setExportIncludeExcluded}
+                excludedCount={folderSelectionStats.excluded}
             />
             {(saveMessage || importMessage || bookmarkActionMessage) && (
                 <div className="options-toast-container">
@@ -1002,8 +1019,8 @@ const Popup: React.FC = () => {
                                                 </svg>
                                             </span>
                                             <span className="options-action-copy">
-                                                <span className="options-action-title">上传书签</span>
-                                                <span className="options-action-subtitle">从外部文件上传书签到浏览器</span>
+                                                <span className="options-action-title">导入书签</span>
+                                                <span className="options-action-subtitle">从外部文件导入书签到浏览器</span>
                                             </span>
                                         </Button>
 
@@ -1125,6 +1142,65 @@ const Popup: React.FC = () => {
         </Container >
     )
 }
+
+const ExportBookmarkModal: React.FC<{
+    show: boolean;
+    onHide: () => void;
+    onConfirm: () => void;
+    includeExcluded: boolean;
+    setIncludeExcluded: (value: boolean) => void;
+    excludedCount: number;
+}> = ({ show, onHide, onConfirm, includeExcluded, setIncludeExcluded, excludedCount }) => {
+    return (
+        <Modal show={show} onHide={onHide} className="export-bookmark-modal" centered backdrop="static">
+            <Modal.Header>
+                <Modal.Title>导出书签选项</Modal.Title>
+                <button
+                    type="button"
+                    className="sync-history-close-btn"
+                    onClick={onHide}
+                    aria-label="关闭"
+                >
+                    <span></span>
+                    <span></span>
+                </button>
+            </Modal.Header>
+            <Modal.Body>
+                <div className="export-option-container">
+                    <p className="export-option-description">
+                        选择导出范围：
+                    </p>
+                    <Form.Group className="export-option-group">
+                        <Form.Check
+                            type="radio"
+                            id="export-selected-only"
+                            name="exportRange"
+                            label={`仅导出已选书签（排除 ${excludedCount} 个书签）`}
+                            checked={!includeExcluded}
+                            onChange={() => setIncludeExcluded(false)}
+                        />
+                        <Form.Check
+                            type="radio"
+                            id="export-all"
+                            name="exportRange"
+                            label="导出全部书签（包含排除的书签）"
+                            checked={includeExcluded}
+                            onChange={() => setIncludeExcluded(true)}
+                        />
+                    </Form.Group>
+                </div>
+            </Modal.Body>
+            <Modal.Footer>
+                <Button variant="secondary" onClick={onHide}>
+                    取消
+                </Button>
+                <Button variant="primary" onClick={onConfirm}>
+                    确认导出
+                </Button>
+            </Modal.Footer>
+        </Modal>
+    );
+};
 
 const SyncHistoryModal: React.FC<{ show: boolean; onHide: () => void; history: any[] }> = ({ show, onHide, history }) => {
     // 弹窗打开时禁止背景滚动
