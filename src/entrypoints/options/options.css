@@ -314,6 +314,53 @@ html, body {
   background: var(--surface);
 }
 
+/* InputGroup 样式优化 */
+.options-form .input-group {
+  display: flex;
+  align-items: stretch;
+}
+
+.options-form .input-group .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+  z-index: 1;
+}
+
+.options-form .input-group .btn,
+.options-form .input-group-append .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+  border-color: var(--border);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 6px 12px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  margin-left: -1px;
+  z-index: 2;
+}
+
+.options-form .input-group .btn:hover,
+.options-form .input-group-append .btn:hover {
+  background: var(--surface);
+  border-color: var(--muted);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+  z-index: 3;
+}
+
+.options-form .input-group-append {
+  display: flex;
+  align-items: stretch;
+}
+
 /* --- Toggle switch: modern pill style inside options form --- */
 .options-form .form-switch .form-check-input {
   width: 38px;
@@ -524,10 +571,10 @@ html, body {
   padding: 9px 14px;
   min-height: 52px;
   border-radius: 10px;
-  border: 1px solid transparent;
+  border: none;
   background: var(--surface-alt);
   color: var(--text-primary);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 10px 25px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   position: relative;
   overflow: visible;
@@ -536,7 +583,7 @@ html, body {
 .options-action-button:focus,
 .options-action-button:hover {
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 16px 30px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.2);
   z-index: 200;
 }
 
@@ -1503,21 +1550,9 @@ body.modal-open .options-col {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
-.export-bookmark-modal .modal-title::before {
-  content: "";
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(135deg, #6366f1, #4338ca);
-  border-radius: 6px;
-  mask: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 13a4 4 0 0 0-4-4h-1" fill="none" stroke="black" stroke-width="2"/><path d="M11 9H8a4 4 0 1 0 0 8h2" fill="none" stroke="black" stroke-width="2"/><path d="M12 8v10" fill="none" stroke="black" stroke-width="2"/><path d="M9 15l3 3 3-3" fill="none" stroke="black" stroke-width="2"/></svg>') center/contain no-repeat;
-  -webkit-mask: url('data:image/svg+xml,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 13a4 4 0 0 0-4-4h-1" fill="none" stroke="black" stroke-width="2"/><path d="M11 9H8a4 4 0 1 0 0 8h2" fill="none" stroke="black" stroke-width="2"/><path d="M12 8v10" fill="none" stroke="black" stroke-width="2"/><path d="M9 15l3 3 3-3" fill="none" stroke="black" stroke-width="2"/></svg>') center/contain no-repeat;
-}
+
 
 .export-bookmark-modal .modal-body {
   padding: 20px;
@@ -1581,12 +1616,27 @@ body.modal-open .options-col {
   transition: all 0.2s ease;
   position: relative;
   z-index: 1;
+  border-radius: 50%;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .export-option-group .form-check-input:checked {
   background-color: var(--accent);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.export-option-group .form-check-input:checked::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #ffffff;
+  border-radius: 50%;
 }
 
 .export-option-group .form-check-input:hover {
@@ -1640,15 +1690,15 @@ body.modal-open .options-col {
 }
 
 .export-bookmark-modal .modal-footer .btn-primary {
-  background: linear-gradient(135deg, #6366f1, #4338ca);
+  background: linear-gradient(135deg, #10b981, #059669);
   border: none;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .export-bookmark-modal .modal-footer .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
 }
 
 /* 确保弹窗背景遮罩正确显示 */
