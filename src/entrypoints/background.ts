@@ -214,7 +214,8 @@ export default defineBackground(() => {
   browser.bookmarks.onCreated.addListener(async (id, info) => {
     console.log('📌 Bookmark created:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
-      const createdInExcludedFolder = await isBookmarkInExcludedFolder(info.parentId);
+      const excludedSet = await getExcludedFolderSet();
+      const createdInExcludedFolder = await isNodeOrAncestorExcluded(info.parentId, excludedSet);
       if (createdInExcludedFolder) {
         console.log('⏭️ Bookmark created inside excluded folder, skipping auto upload');
         refreshLocalCount();
@@ -236,6 +237,14 @@ export default defineBackground(() => {
   browser.bookmarks.onChanged.addListener(async (id, info) => {
     console.log('📝 Bookmark changed:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
+      const excludedSet = await getExcludedFolderSet();
+      const changedInExcludedFolder = await isNodeOrAncestorExcluded(id, excludedSet);
+      if (changedInExcludedFolder) {
+        console.log('⏭️ Bookmark changed inside excluded folder, skipping auto upload');
+        refreshLocalCount();
+        await updateBookmarkStructureTracking();
+        return;
+      }
       console.log('✅ Triggering badge and auto-sync check for changed bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -250,6 +259,16 @@ export default defineBackground(() => {
   browser.bookmarks.onMoved.addListener(async (id, info) => {
     console.log('📦 Bookmark moved:', id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
+      const excludedSet = await getExcludedFolderSet();
+      const movedInExcludedFolder = excludedSet.has(id)
+        || await isNodeOrAncestorExcluded(info.parentId, excludedSet)
+        || await isNodeOrAncestorExcluded(info.oldParentId, excludedSet);
+      if (movedInExcludedFolder) {
+        console.log('⏭️ Bookmark moved inside excluded folder, skipping auto upload');
+        refreshLocalCount();
+        await updateBookmarkStructureTracking();
+        return;
+      }
       console.log('✅ Triggering badge and auto-sync check for moved bookmark');
       browser.action.setBadgeText({ text: "!" });
       browser.action.setBadgeBackgroundColor({ color: "#F00" });
@@ -264,8 +283,10 @@ export default defineBackground(() => {
   browser.bookmarks.onRemoved.addListener(async (id, info) => {
     console.log("Bookmark removed:", id, 'curOperType:', curOperType, 'isClearing:', isClearing);
     if (curOperType === OperType.NONE && !isClearing) {
+      const excludedSet = await getExcludedFolderSet();
       const parentId = info.parentId ?? info.node?.parentId;
-      const removedFromExcludedFolder = await isBookmarkInExcludedFolder(parentId);
+      const removedFromExcludedFolder = excludedSet.has(id)
+        || await isNodeOrAncestorExcluded(parentId, excludedSet);
       if (removedFromExcludedFolder) {
         console.log('⏭️ Bookmark removed inside excluded folder, skipping auto upload');
         refreshLocalCount();
@@ -906,45 +927,58 @@ export default defineBackground(() => {
   }
 
   async function isBookmarkInExcludedFolder(parentId?: string | null): Promise<boolean> {
-    if (!parentId) {
-      return false;
-    }
+    return isNodeOrAncestorExcluded(parentId);
+  }
+
+  async function getExcludedFolderSet(): Promise<Set<string>> {
     try {
       const stored = await browser.storage.local.get(['excludedFolderIds']);
       const excludedIds = Array.isArray(stored.excludedFolderIds)
         ? (stored.excludedFolderIds as string[])
         : [];
-
-      if (!excludedIds.length) {
-        return false;
-      }
-
-      const excludedSet = new Set<string>(excludedIds);
-      let currentId: string | undefined | null = parentId;
-      const visited = new Set<string>();
-
-      while (currentId) {
-        if (excludedSet.has(currentId)) {
-          return true;
-        }
-        if (visited.has(currentId)) {
-          break;
-        }
-        visited.add(currentId);
-        try {
-          const nodes: Bookmarks.BookmarkTreeNode[] = await browser.bookmarks.get(currentId);
-          if (!nodes || !nodes.length) {
-            break;
-          }
-          currentId = nodes[0].parentId;
-        } catch (error) {
-          console.warn('Failed to resolve bookmark parent chain:', error);
-          break;
-        }
-      }
+      return new Set<string>(excludedIds);
     } catch (error) {
-      console.warn('Failed to check excluded folders for new bookmark:', error);
+      console.warn('Failed to load excluded folders:', error);
+      return new Set<string>();
     }
+  }
+
+  async function isNodeOrAncestorExcluded(
+    nodeId?: string | null,
+    excludedSetParam?: Set<string>
+  ): Promise<boolean> {
+    if (!nodeId) {
+      return false;
+    }
+
+    const excludedSet = excludedSetParam ?? await getExcludedFolderSet();
+    if (!excludedSet.size) {
+      return false;
+    }
+
+    const visited = new Set<string>();
+    let currentId: string | undefined | null = nodeId;
+
+    while (currentId) {
+      if (excludedSet.has(currentId)) {
+        return true;
+      }
+      if (visited.has(currentId)) {
+        break;
+      }
+      visited.add(currentId);
+      try {
+        const nodes: Bookmarks.BookmarkTreeNode[] = await browser.bookmarks.get(currentId);
+        if (!nodes || !nodes.length) {
+          break;
+        }
+        currentId = nodes[0].parentId;
+      } catch (error) {
+        console.warn('Failed to resolve bookmark parent chain:', error);
+        break;
+      }
+    }
+
     return false;
   }
 
