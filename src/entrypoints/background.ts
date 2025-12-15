@@ -1616,19 +1616,36 @@ export default defineBackground(() => {
         return;
       }
       
-      const data = await browser.storage.local.get(['lastSyncTime']);
+      // 检查网络连接状态
+      if (!navigator.onLine) {
+        console.log('⚠️ Auto download skipped: No network connection');
+        return;
+      }
+      
+      const data = await browser.storage.local.get(['lastSyncTime', 'lastAutoSyncFailTime']);
       const lastSyncTime = data.lastSyncTime || 0;
+      const lastFailTime = data.lastAutoSyncFailTime || 0;
       const intervalMinutes = setting.autoSyncInterval || 5;
       const intervalMs = intervalMinutes * 60 * 1000;
       const now = Date.now();
       const timeSinceLastSync = now - lastSyncTime;
+      const timeSinceLastFail = now - lastFailTime;
       
       console.log('⏱️ Download timing check:', {
         lastSync: lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never',
+        lastFail: lastFailTime ? new Date(lastFailTime).toLocaleString() : 'Never',
         intervalMinutes,
         timeSinceLastSync: Math.floor(timeSinceLastSync / 1000) + 's',
+        timeSinceLastFail: Math.floor(timeSinceLastFail / 1000) + 's',
         needsSync: !lastSyncTime || timeSinceLastSync >= intervalMs
       });
+
+      // 如果最近失败过，增加重试间隔（最少等待2分钟）
+      const minRetryInterval = 2 * 60 * 1000; // 2分钟
+      if (lastFailTime && timeSinceLastFail < minRetryInterval) {
+        console.log('⏸️ Auto download skipped: waiting for retry interval after last failure');
+        return;
+      }
 
       if (lastSyncTime && now - lastSyncTime < intervalMs) {
         console.log('⏸️ Auto download skipped: interval not reached');
@@ -1645,6 +1662,13 @@ export default defineBackground(() => {
       try {
         await downloadBookmarks({ mergeLocal: true, type: 'auto' });
         console.log('✅ Auto download completed successfully');
+        // 清除失败时间记录
+        await browser.storage.local.remove(['lastAutoSyncFailTime']);
+      } catch (error) {
+        console.error('❌ Auto download failed:', error);
+        // 记录失败时间，用于控制重试间隔
+        await browser.storage.local.set({ lastAutoSyncFailTime: now });
+        throw error;
       } finally {
         curOperType = OperType.NONE;
       }
@@ -1665,6 +1689,13 @@ export default defineBackground(() => {
     }
 
     const intervalMinutes = Math.max(Number(setting.autoSyncInterval) || 5, MIN_AUTO_SYNC_INTERVAL_MINUTES);
+    
+    // 记录alarm创建时间，用于检测系统休眠
+    await browser.storage.local.set({ 
+      lastAlarmScheduleTime: Date.now(),
+      expectedAlarmInterval: intervalMinutes 
+    });
+    
     browser.alarms.create(AUTO_DOWNLOAD_ALARM, {
       delayInMinutes: intervalMinutes,
       periodInMinutes: intervalMinutes,
@@ -1713,11 +1744,32 @@ export default defineBackground(() => {
   browser.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name !== AUTO_DOWNLOAD_ALARM) return;
     try {
+      console.log('⏰ Auto-download alarm triggered');
       await triggerAutoDownloadIfEnabled();
     } catch (error) {
       console.error('❌ Auto-download alarm handler error:', error);
+      // 如果是网络错误，稍后重试
+      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        console.log('🔄 Network error detected, will retry on next alarm');
+      }
     }
   });
+
+  // 监听网络状态变化，网络恢复时尝试同步
+  if (typeof window !== 'undefined' && 'addEventListener' in window) {
+    window.addEventListener('online', async () => {
+      console.log('🌐 Network connection restored, checking for pending sync...');
+      try {
+        const data = await browser.storage.local.get(['lastAutoSyncFailTime']);
+        if (data.lastAutoSyncFailTime) {
+          console.log('🔄 Found previous sync failure, attempting recovery sync...');
+          await triggerAutoDownloadIfEnabled();
+        }
+      } catch (error) {
+        console.error('❌ Network recovery sync failed:', error);
+      }
+    });
+  }
 
   ///暂时不启用自动备份
   /*
@@ -1736,7 +1788,44 @@ export default defineBackground(() => {
   }
   */
 
+  // 检测系统休眠恢复
+  async function detectSleepRecovery() {
+    try {
+      const data = await browser.storage.local.get(['lastAlarmScheduleTime', 'expectedAlarmInterval']);
+      const lastScheduleTime = data.lastAlarmScheduleTime;
+      const expectedInterval = data.expectedAlarmInterval || 5;
+      
+      if (!lastScheduleTime) return;
+      
+      const now = Date.now();
+      const timeSinceSchedule = now - lastScheduleTime;
+      const expectedMaxTime = (expectedInterval + 2) * 60 * 1000; // 允许2分钟误差
+      
+      // 如果时间间隔远超预期，可能是从休眠中恢复
+      if (timeSinceSchedule > expectedMaxTime) {
+        console.log('🛌 Detected potential sleep recovery, checking sync status...');
+        console.log(`   Time since last schedule: ${Math.floor(timeSinceSchedule / 1000)}s`);
+        console.log(`   Expected max time: ${Math.floor(expectedMaxTime / 1000)}s`);
+        
+        // 重新调度alarm并尝试同步
+        await initializeAutoDownloadFromSettings();
+        
+        // 稍等一下再尝试同步，让网络连接稳定
+        setTimeout(async () => {
+          try {
+            await triggerAutoDownloadIfEnabled();
+          } catch (error) {
+            console.error('❌ Sleep recovery sync failed:', error);
+          }
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('❌ Sleep recovery detection failed:', error);
+    }
+  }
+
   // Initialize auto-download timer when background starts
+  detectSleepRecovery();
   initializeAutoDownloadFromSettings();
 
 });
