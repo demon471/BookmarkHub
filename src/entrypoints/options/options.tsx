@@ -708,7 +708,7 @@ const Popup: React.FC = () => {
                 </div>
             </div>
             <Row className="options-layout">
-                <Col xs={12} md={6} lg={6} className="options-col">
+                <Col xs={12} className="options-col">
 
                     <Form id='formOptions' name='formOptions' onSubmit={handleSubmit(onSubmit)} className="options-form">
                         <div className="options-card">
@@ -1071,7 +1071,7 @@ const Popup: React.FC = () => {
                         </div>
                     </Form>
                 </Col>
-                <Col xs={12} md={6} lg={6} className="options-col">
+                <Col xs={12} className="options-col">
 
                     <div className="options-card folder-tree-card">
                         <div className="options-card-header">
@@ -1259,7 +1259,7 @@ const SyncHistoryModal: React.FC<{ show: boolean; onHide: () => void; history: a
     };
 
     return (
-        <Modal show={show} onHide={onHide} className="sync-history-modal" centered backdrop="static">
+        <Modal show={show} onHide={onHide} className="sync-history-modal" centered backdrop="static" scrollable={false}>
             <Modal.Header>
                 <Modal.Title>同步历史</Modal.Title>
                 <button 
