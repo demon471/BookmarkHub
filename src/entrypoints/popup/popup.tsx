@@ -5,7 +5,7 @@ import {
     AiOutlineCloudUpload, AiOutlineCloudDownload,
     AiOutlineSetting, AiOutlineClear,
 } from 'react-icons/ai'
-import 'bootstrap/dist/css/bootstrap.min.css';
+// import 'bootstrap/dist/css/bootstrap.min.css';
 import './popup.css'
 import optionsStorage from '../../utils/optionsStorage'
 
@@ -24,11 +24,20 @@ const Popup: React.FC = () => {
     const [showClearModal, setShowClearModal] = useState(false)
     const [clearSaving, setClearSaving] = useState(false)
 
+    // Temporary state for modal editing
+    const [tempEncryptEnabled, setTempEncryptEnabled] = useState(false)
+    const [tempEncryptPassword, setTempEncryptPassword] = useState('')
+
     const renderPopupToast = (message: string, key: string) => {
         const isSuccess = message.startsWith('✅');
         const cleanMessage = message.replace(/^✅\s*/, '').replace(/^❌\s*/, '');
+        // Check if this is an encryption related success message
+        // Exclude "加密已关闭" (Encryption Disabled) from usage distinct separate color
+        const isEncryption = (cleanMessage.includes('加密') || cleanMessage.includes('Encryption') || cleanMessage.includes('密码'))
+            && !cleanMessage.includes('关闭') && !cleanMessage.includes('disabled');
+
         return (
-            <div key={key} className={`popup-toast ${isSuccess ? 'popup-toast--success' : 'popup-toast--error'}`}>
+            <div key={key} className={`popup-toast ${isSuccess ? 'popup-toast--success' : 'popup-toast--error'} ${isEncryption ? 'popup-toast--encryption' : ''}`}>
                 <div className="popup-toast-icon">
                     {isSuccess ? '✓' : '!'}
                 </div>
@@ -129,6 +138,8 @@ const Popup: React.FC = () => {
     };
 
     const openEncryptModal = () => {
+        setTempEncryptEnabled(encryptEnabled)
+        setTempEncryptPassword(encryptPassword)
         setEncryptError('')
         setShowEncryptModal(true)
     }
@@ -138,17 +149,25 @@ const Popup: React.FC = () => {
         setEncryptSaving(true)
         const shouldRetryDownload = pendingRetryAction === 'download'
         try {
-            const finalEnable = encryptEnabled
-            if (finalEnable && !encryptPassword) {
+            const finalEnable = tempEncryptEnabled
+            if (finalEnable && !tempEncryptPassword) {
                 setEncryptError('请输入加密密码')
                 setEncryptSaving(false)
                 return
             }
             await optionsStorage.set({
                 enableEncrypt: finalEnable,
-                encryptPassword: finalEnable ? encryptPassword : '',
+                encryptPassword: finalEnable ? tempEncryptPassword : '',
             })
-            setStatusMessage('✅ 加密设置已保存')
+            // Update local state only after save
+            setEncryptEnabled(finalEnable);
+            setEncryptPassword(finalEnable ? tempEncryptPassword : '');
+
+            if (finalEnable) {
+                setStatusMessage('✅ 加密设置已保存')
+            } else {
+                setStatusMessage('✅ 加密已关闭')
+            }
             setTimeout(() => setStatusMessage(''), 4000)
             setShowEncryptModal(false)
             setPendingRetryAction(null)
@@ -267,8 +286,8 @@ const Popup: React.FC = () => {
                             <label className="popup-modal-row">
                                 <input
                                     type="checkbox"
-                                    checked={encryptEnabled}
-                                    onChange={e => setEncryptEnabled(e.target.checked)}
+                                    checked={tempEncryptEnabled}
+                                    onChange={e => setTempEncryptEnabled(e.target.checked)}
                                 />
                                 <span>启用加密存储远程书签</span>
                             </label>
@@ -276,10 +295,10 @@ const Popup: React.FC = () => {
                                 <input
                                     type="password"
                                     className="popup-modal-input"
-                                    value={encryptPassword}
-                                    onChange={e => setEncryptPassword(e.target.value)}
+                                    value={tempEncryptPassword}
+                                    onChange={e => setTempEncryptPassword(e.target.value)}
                                     placeholder="请输入加密密码"
-                                    disabled={!encryptEnabled}
+                                    disabled={!tempEncryptEnabled}
                                 />
                             </div>
                             {encryptError && <p className="popup-modal-error">{encryptError}</p>}

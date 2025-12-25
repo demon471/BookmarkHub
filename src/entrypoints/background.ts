@@ -9,7 +9,7 @@ export default defineBackground(() => {
 
   browser.runtime.onInstalled.addListener(async (c) => {
     console.log('🎉 Extension installed/updated');
-    
+
     // 检查是否首次安装
     if (c.reason === 'install') {
       // 首次安装，检查GitHub配置
@@ -27,7 +27,7 @@ export default defineBackground(() => {
         });
       }
     }
-    
+
     // 初始化本地书签计数
     await refreshLocalCount();
     console.log('✅ Extension installed, ready to sync on bookmark changes');
@@ -319,11 +319,11 @@ export default defineBackground(() => {
           console.log('   - Token:', setting.githubToken ? '✓' : '✗');
           console.log('   - Gist ID:', setting.gistID ? '✓' : '✗');
           console.log('   - Gist FileName:', setting.gistFileName);
-          
+
           // 重置初始同步标记，允许重新执行初始同步逻辑
           await browser.storage.local.set({ initialSyncCompleted: false });
           await browser.storage.local.remove(['pendingInitialSync', 'localBookmarkCount', 'lastConfigErrorNotified']);
-          
+
           console.log('🔄 Triggering initial sync after configuration...');
           await performInitialSync();
         } else {
@@ -585,7 +585,7 @@ export default defineBackground(() => {
       // Update last sync time after successful upload
       await updateLastSyncTime('manual');
       console.log('Last sync time updated');
-      
+
       // 记录上传历史
       await addSyncHistory('manual', 'success', Date.now(), `上传成功 (${count}个书签)`);
 
@@ -613,7 +613,7 @@ export default defineBackground(() => {
       console.error('   Error message:', error.message);
       console.error('   Error stack:', error.stack);
       await showSyncBadge('error');
-      
+
       // 记录上传失败历史
       await addSyncHistory('manual', 'error', Date.now(), `上传失败: ${error.message}`);
 
@@ -673,11 +673,11 @@ export default defineBackground(() => {
         const localBookmarks = await getBookmarks();
         const localFormatted = formatBookmarks(localBookmarks);
         const remoteFormatted = syncdata.bookmarks;
-        
+
         console.log('🔍 Comparing local and remote bookmarks...');
         console.log('   📊 Local count:', getBookmarkCount(localFormatted));
         console.log('   📊 Remote count:', getBookmarkCount(remoteFormatted));
-        
+
         if (JSON.stringify(localFormatted) === JSON.stringify(remoteFormatted)) {
           console.log('✅ Local and remote are identical, skip download');
           const count = getBookmarkCount(syncdata.bookmarks);
@@ -705,12 +705,12 @@ export default defineBackground(() => {
         // Update bookmark structure tracking
         await updateBookmarkStructureTracking();
         console.log('Bookmark structure tracking updated after download');
-        
+
         // 记录下载历史（手动记录，自动同步已在 updateLastSyncTime 内追加）
         if (syncType === 'manual') {
           await addSyncHistory('manual', 'success', Date.now(), `下载成功 (${count}个书签)`);
         }
-        
+
         if (setting.enableNotify) {
           await browser.notifications.create({
             type: 'basic',
@@ -738,7 +738,7 @@ export default defineBackground(() => {
 
       const message = error?.message || String(error || '');
       const isPasswordError = message.includes('远程数据已加密');
-      
+
       // 记录下载失败历史
       await addSyncHistory('manual', 'error', Date.now(), `下载失败: ${message}`);
 
@@ -1126,7 +1126,7 @@ export default defineBackground(() => {
 
       const hasConfig = selectedIds.length > 0 || excludedIds.length > 0;
       const excludedSet = new Set<string>(excludedIds);
-      
+
       // 构建被排除文件夹的标题集合（用于跨下载会话保留，因为ID会变化）
       const excludedTitles = new Set<string>();
       const findNodeById = (nodes: BookmarkInfo[], targetId: string): BookmarkInfo | null => {
@@ -1145,7 +1145,7 @@ export default defineBackground(() => {
           excludedTitles.add(node.title);
         }
       }
-      
+
       console.log('🗑️ Clearing bookmarks - excluded titles:', Array.from(excludedTitles));
 
       const nodesToRemove: BookmarkInfo[] = [];
@@ -1190,7 +1190,7 @@ export default defineBackground(() => {
         }
       }
 
-     // 去重后删除（跳过根节点及其第一层子容器，避免尝试删除系统 Root）。
+      // 去重后删除（跳过根节点及其第一层子容器，避免尝试删除系统 Root）。
       // 如果某个节点的祖先也在删除集合中，则只删除祖先，跳过该子节点，
       // 避免在父节点 removeTree 后对子节点再次 removeTree 导致 "Can't find bookmark for id"。
 
@@ -1253,14 +1253,14 @@ export default defineBackground(() => {
   // 增量同步：只处理差异部分，避免闪动
   async function syncBookmarksIncremental(remoteBookmarks: BookmarkInfo[] | undefined) {
     if (!remoteBookmarks) return;
-    
+
     console.log('🔄 Starting incremental sync...');
-    
+
     // 获取被排除的文件夹标题
     const stored = await browser.storage.local.get(['excludedFolderIds']);
     const excludedIds = Array.isArray(stored.excludedFolderIds) ? stored.excludedFolderIds as string[] : [];
     const excludedTitles = new Set<string>();
-    
+
     if (excludedIds.length > 0) {
       const localTree = await browser.bookmarks.getTree();
       const findTitle = (nodes: any[], id: string): string | null => {
@@ -1278,7 +1278,7 @@ export default defineBackground(() => {
         if (title) excludedTitles.add(title);
       }
     }
-    
+
     // 递归同步每个根文件夹
     for (const remoteRoot of remoteBookmarks) {
       // 跳过被排除的文件夹
@@ -1286,7 +1286,7 @@ export default defineBackground(() => {
         console.log(`⏭️ Skipping excluded folder: ${remoteRoot.title}`);
         continue;
       }
-      
+
       // 确定目标父ID
       let targetParentId = '2'; // 默认其他书签
       if (curBrowserType === BrowserType.FIREFOX) {
@@ -1304,7 +1304,7 @@ export default defineBackground(() => {
           case RootBookmarksType.MenuFolder: targetParentId = '2'; break;
         }
       }
-      
+
       // 获取本地该父目录下的现有书签
       let localChildren: Bookmarks.BookmarkTreeNode[] = [];
       try {
@@ -1312,17 +1312,17 @@ export default defineBackground(() => {
       } catch (e) {
         console.warn(`Failed to get children of ${targetParentId}:`, e);
       }
-      
+
       // 过滤掉被排除的本地文件夹
       const localChildrenFiltered = localChildren.filter(c => !excludedTitles.has(c.title));
-      
+
       // 同步子节点
       await syncChildren(targetParentId, remoteRoot.children || [], localChildrenFiltered, excludedTitles);
     }
-    
+
     console.log('✅ Incremental sync completed');
   }
-  
+
   // 同步子节点：对比本地和远程，增删改
   async function syncChildren(
     parentId: string,
@@ -1336,32 +1336,32 @@ export default defineBackground(() => {
       const key = local.url ? `${local.title}|${local.url}` : `folder:${local.title}`;
       localMap.set(key, local);
     }
-    
+
     const processedLocalIds = new Set<string>();
-    
+
     // 遍历远程书签，创建或更新
     for (let i = 0; i < remoteChildren.length; i++) {
       const remote = remoteChildren[i];
-      
+
       // 跳过被排除的文件夹
       if (!remote.url && remote.title && excludedTitles.has(remote.title)) {
         continue;
       }
-      
+
       const key = remote.url ? `${remote.title}|${remote.url}` : `folder:${remote.title}`;
       const existing = localMap.get(key);
-      
+
       if (existing) {
         // 已存在，标记为已处理
         processedLocalIds.add(existing.id);
-        
+
         // 如果是文件夹，递归同步子节点
         if (!remote.url && remote.children) {
           let existingChildren: Bookmarks.BookmarkTreeNode[] = [];
           try {
             existingChildren = await browser.bookmarks.getChildren(existing.id);
           } catch (e) { /* ignore */ }
-          
+
           const filteredChildren = existingChildren.filter(c => !excludedTitles.has(c.title));
           await syncChildren(existing.id, remote.children, filteredChildren, excludedTitles);
         }
@@ -1389,7 +1389,7 @@ export default defineBackground(() => {
         }
       }
     }
-    
+
     // 删除本地多余的书签（不在远程中的）
     for (const local of localChildren) {
       if (!processedLocalIds.has(local.id)) {
@@ -1541,7 +1541,7 @@ export default defineBackground(() => {
     try {
       const data = await browser.storage.local.get(['syncHistory']);
       const history = Array.isArray(data.syncHistory) ? data.syncHistory : [];
-      
+
       // 添加新记录
       history.unshift({
         type,
@@ -1549,10 +1549,10 @@ export default defineBackground(() => {
         timestamp,
         message: message || (status === 'success' ? '同步成功' : '同步失败')
       });
-      
+
       // 只保留最近10条记录
       const trimmedHistory = history.slice(0, 10);
-      
+
       await browser.storage.local.set({ syncHistory: trimmedHistory });
     } catch (error) {
       console.error('Error adding sync history:', error);
@@ -1563,7 +1563,7 @@ export default defineBackground(() => {
     try {
       console.log('🔍 Checking auto-upload conditions...');
       const setting = await Setting.build();
-      
+
       // GitHub configuration check
       if (!setting.githubToken || !setting.gistID || !setting.gistFileName) {
         console.log('⚠️ Auto upload skipped: GitHub not fully configured');
@@ -1572,12 +1572,12 @@ export default defineBackground(() => {
         console.log('   - File Name:', setting.gistFileName ? '✓' : '✗');
         return;
       }
-      
+
       if (curOperType !== OperType.NONE) {
         console.log('⏸️ Auto upload skipped: another operation in progress');
         return;
       }
-      
+
       console.log('🚀 Auto upload triggered! Starting upload...');
       curOperType = OperType.SYNC;
       try {
@@ -1595,7 +1595,7 @@ export default defineBackground(() => {
   async function triggerAutoDownloadIfEnabled(): Promise<void> {
     try {
       console.log('🔍 Checking auto-download conditions...');
-      
+
       const setting = await Setting.build();
       console.log('⚙️ Auto-download settings:', {
         enabled: setting.autoSyncEnabled,
@@ -1604,24 +1604,24 @@ export default defineBackground(() => {
         hasGistID: !!setting.gistID,
         hasFileName: !!setting.gistFileName
       });
-      
+
       if (!setting.autoSyncEnabled) {
         console.log('⏸️ Auto download disabled, skipping');
         return;
       }
-      
+
       // GitHub configuration check
       if (!setting.githubToken || !setting.gistID || !setting.gistFileName) {
         console.log('⚠️ Auto download skipped: GitHub not fully configured');
         return;
       }
-      
+
       // 检查网络连接状态
       if (!navigator.onLine) {
         console.log('⚠️ Auto download skipped: No network connection');
         return;
       }
-      
+
       const data = await browser.storage.local.get(['lastSyncTime', 'lastAutoSyncFailTime']);
       const lastSyncTime = data.lastSyncTime || 0;
       const lastFailTime = data.lastAutoSyncFailTime || 0;
@@ -1630,7 +1630,7 @@ export default defineBackground(() => {
       const now = Date.now();
       const timeSinceLastSync = now - lastSyncTime;
       const timeSinceLastFail = now - lastFailTime;
-      
+
       console.log('⏱️ Download timing check:', {
         lastSync: lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never',
         lastFail: lastFailTime ? new Date(lastFailTime).toLocaleString() : 'Never',
@@ -1651,12 +1651,12 @@ export default defineBackground(() => {
         console.log('⏸️ Auto download skipped: interval not reached');
         return;
       }
-      
+
       if (curOperType !== OperType.NONE) {
         console.log('⏸️ Auto download skipped: another operation in progress');
         return;
       }
-      
+
       console.log('🚀 Auto download triggered! Starting merge download...');
       curOperType = OperType.SYNC;
       try {
@@ -1689,13 +1689,13 @@ export default defineBackground(() => {
     }
 
     const intervalMinutes = Math.max(Number(setting.autoSyncInterval) || 5, MIN_AUTO_SYNC_INTERVAL_MINUTES);
-    
+
     // 记录alarm创建时间，用于检测系统休眠
-    await browser.storage.local.set({ 
+    await browser.storage.local.set({
       lastAlarmScheduleTime: Date.now(),
-      expectedAlarmInterval: intervalMinutes 
+      expectedAlarmInterval: intervalMinutes
     });
-    
+
     browser.alarms.create(AUTO_DOWNLOAD_ALARM, {
       delayInMinutes: intervalMinutes,
       periodInMinutes: intervalMinutes,
@@ -1749,7 +1749,8 @@ export default defineBackground(() => {
     } catch (error) {
       console.error('❌ Auto-download alarm handler error:', error);
       // 如果是网络错误，稍后重试
-      if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      const err = error as any;
+      if (err.message?.includes('network') || err.message?.includes('fetch')) {
         console.log('🔄 Network error detected, will retry on next alarm');
       }
     }
@@ -1794,22 +1795,22 @@ export default defineBackground(() => {
       const data = await browser.storage.local.get(['lastAlarmScheduleTime', 'expectedAlarmInterval']);
       const lastScheduleTime = data.lastAlarmScheduleTime;
       const expectedInterval = data.expectedAlarmInterval || 5;
-      
+
       if (!lastScheduleTime) return;
-      
+
       const now = Date.now();
       const timeSinceSchedule = now - lastScheduleTime;
       const expectedMaxTime = (expectedInterval + 2) * 60 * 1000; // 允许2分钟误差
-      
+
       // 如果时间间隔远超预期，可能是从休眠中恢复
       if (timeSinceSchedule > expectedMaxTime) {
         console.log('🛌 Detected potential sleep recovery, checking sync status...');
         console.log(`   Time since last schedule: ${Math.floor(timeSinceSchedule / 1000)}s`);
         console.log(`   Expected max time: ${Math.floor(expectedMaxTime / 1000)}s`);
-        
+
         // 重新调度alarm并尝试同步
         await initializeAutoDownloadFromSettings();
-        
+
         // 稍等一下再尝试同步，让网络连接稳定
         setTimeout(async () => {
           try {
